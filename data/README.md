@@ -6,8 +6,9 @@ are git-ignored; only the YAML configs and folder placeholders are tracked.
 ```
 data/
 ├── raw/                    # Unlabelled photos you collect (any structure)
-└── household/              # YOLO-format training dataset (v1, 43 classes)
-    ├── data.yaml           # class names, nc, train/val paths
+└── household/              # YOLO-format training dataset
+    ├── data.yaml           # V1 (active): 15 classes, train/val paths
+    ├── data_v2.yaml        # V2 (future): 43 classes
     ├── source_mapping.yaml # which COCO / Open Images classes feed each class
     ├── images/
     │   ├── train/
@@ -29,7 +30,7 @@ One line per object in `labels/<split>/<image-name>.txt`:
 ```
 
 Coordinates are normalised to 0–1, and `class_id` must match `names` in
-`household/data.yaml`. **Label every one of the 43 classes that appears in
+the YAML you train with. **Label every class from that YAML that appears in
 an image**, not only the object the photo was taken for.
 
 ## Custom photos

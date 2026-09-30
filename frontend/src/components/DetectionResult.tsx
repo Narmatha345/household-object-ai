@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { DetectedObject, DetectionResponse } from '../types/detection'
+import type { DetectedObject, DetectionResponse, DetectionTiming } from '../types/detection'
 import { ChipIcon, CloudIcon, InfoIcon } from './Icons'
 
 interface DetectionResultProps {
@@ -15,6 +15,42 @@ function Metric({ label, children }: { label: string; children: ReactNode }) {
     <div className="min-w-0">
       <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
       <dd className="mt-1.5">{children}</dd>
+    </div>
+  )
+}
+
+const formatSeconds = (ms: number | null) => {
+  if (ms === null) return 'Unavailable'
+  const seconds = ms / 1000
+  return seconds < 0.01 ? '< 0.01 s' : `${seconds.toFixed(2)} s`
+}
+
+function TimingPanel({ timing, fallbackUsed }: { timing: DetectionTiming; fallbackUsed: boolean }) {
+  const rows: Array<[string, string]> = fallbackUsed
+    ? [
+        ['Local inference', formatSeconds(timing.local_inference_ms)],
+        ['OpenAI processing', formatSeconds(timing.openai_ms)],
+        ['Total processing', formatSeconds(timing.total_ms)],
+        ['OpenAI called', 'Yes'],
+      ]
+    : [
+        ['Inference time', formatSeconds(timing.local_inference_ms)],
+        ['Total processing time', formatSeconds(timing.total_ms)],
+        ['OpenAI called', 'No'],
+      ]
+
+  return (
+    <div>
+      <h3 className="text-sm font-semibold text-slate-700">Processing time</h3>
+      <dl className={`mt-2 grid grid-cols-2 gap-2 ${fallbackUsed ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
+        {rows.map(([label, value]) => (
+          <div key={label} className="rounded-lg border border-slate-200 px-3 py-2">
+            <dt className="text-xs text-slate-500">{label}</dt>
+            <dd className="mt-0.5 text-sm font-semibold tabular-nums text-slate-900">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-1.5 text-xs text-slate-400">Measured on the server; excludes upload time.</p>
     </div>
   )
 }
@@ -105,6 +141,8 @@ export default function DetectionResult({ result }: DetectionResultProps) {
           )}
         </p>
       </div>
+
+      {result.timing && <TimingPanel timing={result.timing} fallbackUsed={result.fallback_used} />}
 
       {(result.description || result.reliability_note) && (
         <div className="space-y-1.5 text-sm">

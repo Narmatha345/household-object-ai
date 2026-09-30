@@ -3,6 +3,96 @@
 Status: **planning only.** No dataset has been downloaded, nothing has been
 trained, and production still uses `models/yolo26n.pt`.
 
+**Scope update:** V1 is now a **reduced 15-class model** (`data/household/data.yaml`).
+The 43-class list below is kept as the **future V2** reference
+(`data/household/data_v2.yaml`).
+
+---
+
+## V1 reduced scope (15 classes) — active
+
+### What actually makes local inference faster
+
+Measured on this laptop (i3-1215U, CPU only, YOLO26n, median of 15 warm runs):
+
+| Change | Latency | vs. today |
+|---|---:|---:|
+| Today: 80 COCO classes, 640 px | 52.7–58.6 ms | – |
+| 43 classes, 640 px (untrained head) | 54.4 ms | ≈ same |
+| 16 classes, 640 px (untrained head) | 56.5 ms | ≈ same |
+| 80 classes, **512 px** | 37.9 ms | **−28%** |
+| 80 classes, **416 px** | 28.9 ms | **−45%** |
+| 80 classes, **320 px** | 21.5 ms | **−59%** |
+
+**The number of classes has no measurable effect on speed.** The classification
+head is a tiny part of YOLO's compute; the backbone, which runs over every
+pixel, dominates. Fewer classes still help in other ways: less data to collect
+and label, faster training, and more examples per class, so better accuracy.
+**The speed gain comes from input resolution.** The plan for V1 is to train
+and serve at **`imgsz=416`**, about 45% faster. That's why V1 favours large
+and medium objects that stay recognisable at lower resolution. Exporting to
+OpenVINO or ONNX is a further, independent CPU speed-up.
+
+`imgsz` is not changed yet. Today's model still runs at 640, and switching
+belongs to the train-and-evaluate phase, measured with the new timing fields.
+
+Also measured: the **first request after startup is slow** (~2.3–2.7 s here)
+because PyTorch warms up. Later requests take 54–99 ms. Running one dummy
+inference at startup would hide this from users (not implemented).
+
+### V1 classes and why each was chosen
+
+| id | Class | Why it's in V1 | Data |
+|---:|---|---|---|
+| 0 | bed | Defines a bedroom; large, easy at low resolution | COCO + OI |
+| 1 | sofa | Defines a living room; large | COCO + OI + HomeObjects |
+| 2 | chair | Most common furniture in every room | COCO + OI |
+| 3 | table | Merged dining/coffee/desk; in every home | COCO + OI |
+| 4 | tv | Most common living-room appliance | COCO + OI |
+| 5 | laptop | Very common; distinct shape | COCO + OI |
+| 6 | refrigerator | Defines a kitchen; large | COCO + OI |
+| 7 | microwave | Common kitchen appliance | COCO + OI |
+| 8 | washing machine | Common, **not in COCO**, so today it always falls back | OI + custom |
+| 9 | ceiling fan | Near-universal in Indian homes, **not in COCO** | OI + custom |
+| 10 | cupboard | Merged wardrobe/cabinet/almirah; in every home, **not in COCO** | OI + custom |
+| 11 | gas stove | Defines an Indian kitchen, **not in COCO** | OI + custom |
+| 12 | pressure cooker | Key Indian kitchen object, **not in any usable public set** | Custom photos |
+| 13 | bottle | Most common small household item; strong public data | COCO + OI |
+| 14 | person | In most camera captures. Dropping it would send selfies to OpenAI | COCO |
+
+The selection rules were:
+1. The object is found in nearly every home.
+2. It's large or medium, so it survives `imgsz=416`.
+3. Either it's already detected today, so there's no regression, or it's a
+   high-value gap that currently always triggers OpenAI.
+4. At most one class depends entirely on custom photos (`pressure cooker`),
+   which keeps the V1 photo workload small.
+
+### Moved to V2 (still in `data_v2.yaml`)
+
+| Class(es) | Why deferred |
+|---|---|
+| remote, mouse, keyboard, mobile phone, cup, clock, book, plate, bowl | Small objects. Accuracy drops at 416 px, and some are better handled at 640 in V2. |
+| monitor | Often confused with `tv`; add it once V1 is stable. |
+| door, window, mirror, photo frame | Large flat rectangles that confuse each other. `window`'s data (33k boxes) would dominate training. |
+| shoe, pillow, lamp, potted plant, backpack, dustbin, sink, toilet, fan | Less important for V1's purpose, or noisier data. `shoe` is mostly worn footwear in public data. |
+| water drum, mixer grinder, bucket | Need entirely custom photo sets (300+ each). Adding them after V1 proves the pipeline. |
+| cat, dog | Keep today's COCO coverage in V2. In V1 they fall back to OpenAI. |
+
+**Trade-off to accept:** V1 no longer covers some objects the current COCO
+model detects (cup, remote, phone, keyboard, book, clock, sink, toilet, cat,
+dog…). With V1 those images would fall back to OpenAI. So V1 should only
+replace `yolo26n.pt` if the evaluation shows a **lower overall fallback rate**
+on real household photos. Otherwise, wait for V2.
+
+**Custom photo workload for V1:** pressure cooker 300/60, plus extra photos
+for washing machine, ceiling fan, cupboard (steel almirah) and gas stove
+(150–200/30–40 each). That's about 1,100 photos, against about 2,200 for V2.
+
+---
+
+# V2 reference plan (43 classes)
+
 ---
 
 ## Phase 1 – How the current system works
@@ -36,7 +126,7 @@ Things the plan must handle:
 
 ---
 
-## Phase 2 – Class list (v1: 43 classes)
+## Phase 2 – Class list (V2: 43 classes)
 
 Availability was checked against the class lists of COCO (80), Ultralytics
 HomeObjects-3K (12), Open Images V7 (601 boxable), Objects365 (365) and LVIS
@@ -159,7 +249,8 @@ OpenAI fallback, saved with consent, would be the best new training data.
 
 ```
 data/household/
-├── data.yaml            # 43 classes, train/val paths, nc
+├── data.yaml            # V1 (active): 15 classes, train/val paths, nc
+├── data_v2.yaml         # V2 (future): 43 classes
 ├── source_mapping.yaml  # which COCO / Open Images classes feed each class
 ├── images/{train,val}/
 └── labels/{train,val}/

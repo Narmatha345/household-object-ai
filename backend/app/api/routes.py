@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 from fastapi import APIRouter, File, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 
@@ -25,6 +27,8 @@ def health(request: Request) -> HealthResponse:
 
 @router.post("/detect", response_model=DetectionResponse, responses=_ERROR_RESPONSES)
 async def detect(request: Request, file: UploadFile = File(...)) -> DetectionResponse:
+    # Starts once FastAPI has received the upload; network transfer time is excluded.
+    started = time.perf_counter()
     state = request.app.state
     validate_upload_metadata(file.filename, file.content_type)
 
@@ -33,7 +37,7 @@ async def detect(request: Request, file: UploadFile = File(...)) -> DetectionRes
     image = decode_image(data, state.settings.max_upload_bytes)
 
     # YOLO inference and the OpenAI call are blocking; keep the event loop free.
-    return await run_in_threadpool(state.detection_router.detect, image)
+    return await run_in_threadpool(state.detection_router.detect, image, started)
 
 
 @router.get("/stats", response_model=StatsResponse)

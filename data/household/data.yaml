@@ -1,4 +1,6 @@
-# Ultralytics YOLO dataset config for the specialized household model (v1).
+# Ultralytics YOLO dataset config for the specialized household model - V1 (15 classes).
+# Reduced scope for faster data collection, training and CPU inference.
+# The full 43-class list is kept in data_v2.yaml for later.
 # Plan and class decisions: docs/household-model-plan.md
 #
 # No `path:` key on purpose: Ultralytics then resolves train/val relative to
@@ -7,48 +9,20 @@
 train: images/train
 val: images/val
 
-nc: 43
+nc: 15
 names:
   0: bed
   1: sofa
   2: chair
   3: table
   4: tv
-  5: monitor
-  6: laptop
-  7: keyboard
-  8: mouse
-  9: remote
-  10: mobile phone
-  11: refrigerator
-  12: microwave
-  13: washing machine
-  14: ceiling fan
-  15: fan
-  16: lamp
-  17: cupboard
-  18: door
-  19: window
-  20: mirror
-  21: clock
-  22: book
-  23: bottle
-  24: cup
-  25: plate
-  26: bowl
-  27: pressure cooker
-  28: dustbin
-  29: backpack
-  30: shoe
-  31: potted plant
-  32: photo frame
-  33: water drum
-  34: pillow
-  35: gas stove
-  36: sink
-  37: toilet
-  38: mixer grinder
-  39: bucket
-  40: person
-  41: cat
-  42: dog
+  5: laptop
+  6: refrigerator
+  7: microwave
+  8: washing machine
+  9: ceiling fan
+  10: cupboard
+  11: gas stove
+  12: pressure cooker
+  13: bottle
+  14: person

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,6 +19,7 @@ class FakeDetector:
     def __init__(self, detections: list[RawDetection] | None = None) -> None:
         self.detections = detections or []
         self.calls = 0
+        self.delay_s = 0.0  # simulated inference time
 
     @property
     def is_loaded(self) -> bool:
@@ -25,6 +27,8 @@ class FakeDetector:
 
     def detect(self, image: Image.Image) -> list[RawDetection]:
         self.calls += 1
+        if self.delay_s:
+            time.sleep(self.delay_s)
         return list(self.detections)
 
 
@@ -35,6 +39,7 @@ class FakeFallback:
         self.fail = fail
         self.calls = 0
         self.last_hints: list[str] | None = None
+        self.delay_s = 0.0  # simulated OpenAI latency
 
     @property
     def is_configured(self) -> bool:
@@ -43,6 +48,8 @@ class FakeFallback:
     def detect(self, image: Image.Image, local_hints: list[str] | None = None) -> FallbackResult:
         self.calls += 1
         self.last_hints = local_hints
+        if self.delay_s:
+            time.sleep(self.delay_s)
         if self.fail:
             raise FallbackError("The AI fallback service is currently unavailable. Please try again.")
         return FallbackResult(

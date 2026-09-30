@@ -16,6 +16,23 @@ class DetectedObject(BaseModel):
     )
 
 
+class DetectionTiming(BaseModel):
+    """Server-side durations in milliseconds, measured with time.perf_counter()."""
+
+    local_inference_ms: float | None = Field(
+        default=None, description="YOLO predict call (preprocess + inference + NMS); None if it failed"
+    )
+    local_processing_ms: float | None = Field(
+        default=None, description="Household-label filtering, confidence gate and de-duplication"
+    )
+    openai_ms: float | None = Field(
+        default=None, description="OpenAI fallback (image encoding + API call); None when not called"
+    )
+    total_ms: float = Field(
+        description="From the /api/detect handler start (after upload receipt) to the response"
+    )
+
+
 class DetectionResponse(BaseModel):
     source: DetectionSource
     objects: list[DetectedObject]
@@ -26,6 +43,8 @@ class DetectionResponse(BaseModel):
     # Low-confidence local detections, kept for transparency when falling back.
     local_candidates: list[DetectedObject] = Field(default_factory=list)
     confidence_threshold: float
+    # Optional so older clients and fixtures without timing stay valid.
+    timing: DetectionTiming | None = None
 
 
 class HealthResponse(BaseModel):

@@ -2,7 +2,8 @@
 #   coco:        COCO 2017 class names that map to this class
 #   open_images: Open Images V7 boxable class names that map to this class
 #   custom:      true = our own labelled photos are required or strongly needed
-# Class names must match data.yaml exactly.
+# Covers all 43 V2 classes (data_v2.yaml). The V1 build (data.yaml, 15 classes)
+# uses only the entries whose names appear in data.yaml. Names must match exactly.
 
 bed:             { coco: [bed], open_images: [Bed] }
 sofa:            { coco: [couch], open_images: [Couch] }

@@ -3,16 +3,21 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from PIL import Image
 
 from app.errors import AppError, LocalInferenceError, ModelLoadError
-from app.schemas import DetectionResponse
+from app.schemas import DetectionResponse, DetectionTiming
 from app.services.local_detection import LocalDetectionResult, LocalDetectionService
 from app.services.openai_fallback import FallbackDetector
 from app.services.stats import StatsTracker
 
 logger = logging.getLogger(__name__)
+
+
+def _ms_since(start: float) -> float:
+    return round((time.perf_counter() - start) * 1000, 2)
 
 
 class DetectionRouter:
@@ -26,7 +31,10 @@ class DetectionRouter:
         self._fallback = fallback
         self._stats = stats
 
-    def detect(self, image: Image.Image) -> DetectionResponse:
+    def detect(self, image: Image.Image, request_started: float | None = None) -> DetectionResponse:
+        """Route one image. `request_started` is a time.perf_counter() value from the caller,
+        so total_ms can include upload decoding; defaults to now."""
+        started = request_started if request_started is not None else time.perf_counter()
         threshold = self._local.confidence_threshold
 
         # 1. Always try the local model first.
@@ -47,15 +55,22 @@ class DetectionRouter:
                 objects=local_result.objects,
                 fallback_used=False,
                 confidence_threshold=threshold,
+                timing=DetectionTiming(
+                    local_inference_ms=local_result.inference_ms,
+                    local_processing_ms=local_result.processing_ms,
+                    total_ms=_ms_since(started),
+                ),
             )
 
         # 3. Unreliable -> OpenAI fallback.
         hints = [c.label for c in local_result.candidates]
+        openai_start = time.perf_counter()
         try:
             fallback_result = self._fallback.detect(image, local_hints=hints or None)
         except AppError:
             self._stats.record_failure()
             raise
+        openai_ms = _ms_since(openai_start)
 
         self._stats.record_fallback()
         return DetectionResponse(
@@ -67,4 +82,10 @@ class DetectionRouter:
             reliability_note=fallback_result.reliability_note,
             local_candidates=local_result.candidates,
             confidence_threshold=threshold,
+            timing=DetectionTiming(
+                local_inference_ms=local_result.inference_ms,
+                local_processing_ms=local_result.processing_ms,
+                openai_ms=openai_ms,
+                total_ms=_ms_since(started),
+            ),
         )

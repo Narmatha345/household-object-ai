@@ -5,6 +5,14 @@ export interface DetectedObject {
   confidence: number | null
 }
 
+/** Server-side durations in milliseconds. */
+export interface DetectionTiming {
+  local_inference_ms: number | null
+  local_processing_ms: number | null
+  openai_ms: number | null
+  total_ms: number
+}
+
 export interface DetectionResponse {
   source: DetectionSource
   objects: DetectedObject[]
@@ -14,6 +22,8 @@ export interface DetectionResponse {
   reliability_note: string | null
   local_candidates: DetectedObject[]
   confidence_threshold: number
+  /** Optional: older backends don't send it. */
+  timing?: DetectionTiming | null
 }
 
 export interface HealthResponse {
