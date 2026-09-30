@@ -67,6 +67,27 @@ def encode_image_for_upload(image: Image.Image, max_side: int) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
 
 
+_QUOTA_CODES = {"insufficient_quota", "credit_balance_exhausted", "billing_hard_limit_reached"}
+
+
+def describe_openai_error(exc: Exception) -> str:
+    """Map an OpenAI SDK error to a user-safe message that says what to fix."""
+    import openai
+
+    if isinstance(exc, openai.APIStatusError):
+        code = getattr(exc, "code", None)
+        error_type = exc.body.get("type") if isinstance(exc.body, dict) else None
+        if code in _QUOTA_CODES or error_type in _QUOTA_CODES:
+            return "The OpenAI account has no credits left. Add credits to enable the AI fallback."
+        if isinstance(exc, (openai.AuthenticationError, openai.PermissionDeniedError)):
+            return "The OpenAI API key on the server is invalid or lacks access."
+        if isinstance(exc, openai.RateLimitError):
+            return "The AI fallback is rate-limited right now. Please try again in a moment."
+    if isinstance(exc, openai.APITimeoutError):
+        return "The AI fallback timed out. Please try again."
+    return "The AI fallback service is currently unavailable. Please try again."
+
+
 class OpenAIFallbackService:
     def __init__(
         self,
@@ -126,9 +147,9 @@ class OpenAIFallbackService:
             )
             payload = response.output_parsed
         except Exception as exc:
-            # Log the real error server-side; return a generic message to clients.
+            # Log the real error server-side; return only a safe summary to clients.
             logger.exception("OpenAI fallback request failed")
-            raise FallbackError("The AI fallback service is currently unavailable. Please try again.") from exc
+            raise FallbackError(describe_openai_error(exc)) from exc
 
         if payload is None:
             raise FallbackError("The AI fallback service returned an unreadable response.")
