@@ -20,9 +20,12 @@ runs/
 
 # Dataset contents
 data/raw/*
-data/processed/*
 !data/raw/.gitkeep
-!data/processed/.gitkeep
+data/household/images/*/*
+data/household/labels/*/*
+!data/household/images/*/.gitkeep
+!data/household/labels/*/.gitkeep
+data/household/**/*.cache
 
 # Node
 node_modules/

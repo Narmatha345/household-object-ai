@@ -1,0 +1,53 @@
+# Where each training class comes from. Used by the Phase 5 dataset build.
+#   coco:        COCO 2017 class names that map to this class
+#   open_images: Open Images V7 boxable class names that map to this class
+#   custom:      true = our own labelled photos are required or strongly needed
+# Class names must match data.yaml exactly.
+
+bed:             { coco: [bed], open_images: [Bed] }
+sofa:            { coco: [couch], open_images: [Couch] }
+chair:           { coco: [chair], open_images: [Chair] }
+table:           { coco: [dining table], open_images: [Table, "Kitchen & dining room table", Coffee table, Desk] }
+tv:              { coco: [tv], open_images: [Television] }
+monitor:         { open_images: [Computer monitor] }
+laptop:          { coco: [laptop], open_images: [Laptop] }
+keyboard:        { coco: [keyboard], open_images: [Computer keyboard] }
+mouse:           { coco: [mouse], open_images: [Computer mouse] }
+remote:          { coco: [remote], open_images: [Remote control] }
+mobile phone:    { coco: [cell phone], open_images: [Mobile phone] }
+refrigerator:    { coco: [refrigerator], open_images: [Refrigerator] }
+microwave:       { coco: [microwave], open_images: [Microwave oven] }
+washing machine: { open_images: [Washing machine], custom: true }
+ceiling fan:     { open_images: [Ceiling fan], custom: true }
+fan:             { open_images: [Mechanical fan] }
+lamp:            { open_images: [Lamp] }
+cupboard:        { open_images: [Cupboard, Cabinetry, Wardrobe, Closet], custom: true }
+door:            { open_images: [Door] }
+window:          { open_images: [Window] }
+mirror:          { open_images: [Mirror] }
+clock:           { coco: [clock], open_images: [Clock] }
+book:            { coco: [book], open_images: [Book] }
+bottle:          { coco: [bottle], open_images: [Bottle] }
+cup:             { coco: [cup], open_images: [Mug, Coffee cup] }
+plate:           { open_images: [Plate] }
+bowl:            { coco: [bowl], open_images: [Bowl] }
+pressure cooker: { open_images: [Pressure cooker], custom: true }
+dustbin:         { open_images: [Waste container], custom: true }
+backpack:        { coco: [backpack], open_images: [Backpack] }
+shoe:            { open_images: [Footwear] }
+potted plant:    { coco: [potted plant], open_images: [Houseplant, Flowerpot] }
+photo frame:     { open_images: [Picture frame] }
+water drum:      { custom: true }
+pillow:          { open_images: [Pillow] }
+gas stove:       { open_images: [Gas stove], custom: true }
+sink:            { coco: [sink], open_images: [Sink] }
+toilet:          { coco: [toilet], open_images: [Toilet] }
+mixer grinder:   { custom: true }
+bucket:          { custom: true }
+person:          { coco: [person] }
+cat:             { coco: [cat] }
+dog:             { coco: [dog] }
+
+# Build rules (see docs/household-model-plan.md, Phase 3):
+max_boxes_per_class: 1500
+exclude_open_images_flags: [IsDepiction, IsGroupOf]

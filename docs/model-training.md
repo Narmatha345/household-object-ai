@@ -19,9 +19,10 @@ class from different rooms, angles, distances and lighting.
 ## 2. Label in YOLO format
 
 Use Label Studio, CVAT, or Roboflow and export in YOLO format into
-`data/processed/` (layout in [data/README.md](../data/README.md)). Update the
-`names:` list in [data/dataset.yaml](../data/dataset.yaml) so the class IDs match
-your labels.
+`data/household/` (layout in [data/README.md](../data/README.md)). Class IDs
+must match the `names:` list in
+[data/household/data.yaml](../data/household/data.yaml). The v1 class list and
+data sources are explained in [household-model-plan.md](household-model-plan.md).
 
 Tips:
 - Keep the COCO household classes you still need in the class list, and label
@@ -36,7 +37,7 @@ From the `backend/` folder with the virtual environment active:
 ```bash
 yolo detect train \
   model=models/yolo26n.pt \
-  data=../data/dataset.yaml \
+  data=../data/household/data.yaml \
   epochs=100 imgsz=640 batch=16 patience=20 \
   project=runs name=household-yolo26n
 ```
@@ -47,7 +48,7 @@ Or in Python:
 from ultralytics import YOLO
 
 model = YOLO("models/yolo26n.pt")  # start from pretrained COCO weights
-model.train(data="../data/dataset.yaml", epochs=100, imgsz=640, batch=16, patience=20,
+model.train(data="../data/household/data.yaml", epochs=100, imgsz=640, batch=16, patience=20,
             project="runs", name="household-yolo26n")
 ```
 
@@ -57,7 +58,7 @@ epochs or a smaller `imgsz` to check that the pipeline works.
 ## 4. Evaluate
 
 ```bash
-yolo detect val model=runs/household-yolo26n/weights/best.pt data=../data/dataset.yaml
+yolo detect val model=runs/household-yolo26n/weights/best.pt data=../data/household/data.yaml
 ```
 
 Check mAP50-95 and per-class precision/recall. Look closely at classes with

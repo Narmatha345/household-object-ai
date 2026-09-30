@@ -67,8 +67,8 @@ household-object-ai/
 │   │   └── main.py           App factory + wiring
 │   ├── models/               YOLO weights (git-ignored, auto-downloaded)
 │   └── tests/
-├── data/                     Dataset layout + dataset.yaml for future fine-tuning
-└── docs/                     architecture.md, model-training.md
+├── data/                     household/ YOLO dataset (data.yaml, 43 classes) for fine-tuning
+└── docs/                     architecture.md, model-training.md, household-model-plan.md
 ```
 
 ## 5. Local setup
@@ -203,9 +203,10 @@ curl -F "file=@living-room.jpg" http://localhost:8000/api/detect
 
 ## 13. Replacing the pretrained model with a custom household model
 
-1. Label a household dataset in YOLO format under `data/processed/` and update
-   `data/dataset.yaml`.
-2. Fine-tune: `yolo detect train model=models/yolo26n.pt data=../data/dataset.yaml epochs=100`
+1. Build the YOLO-format dataset in `data/household/`. The 43-class v1 list,
+   data sources and photo targets are in
+   [docs/household-model-plan.md](docs/household-model-plan.md).
+2. Fine-tune on a GPU: `yolo detect train model=models/yolo26n.pt data=../data/household/data.yaml epochs=100`
 3. Copy `runs/.../weights/best.pt` to `backend/models/household-yolo26n.pt`.
 4. In `backend/.env`, set `MODEL_PATH=models/household-yolo26n.pt` and
    `HOUSEHOLD_LABELS=*`, then restart.
