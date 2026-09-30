@@ -29,36 +29,64 @@ export default function CameraCapture({ disabled, onCapture }: CameraCaptureProp
   const streamRef = useRef<MediaStream | null>(null)
   const [status, setStatus] = useState<'idle' | 'starting' | 'live'>('idle')
   const [error, setError] = useState<string | null>(null)
+  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([])
+  const [activeDeviceId, setActiveDeviceId] = useState<string | null>(null)
 
-  const stopCamera = useCallback(() => {
+  const releaseStream = () => {
     streamRef.current?.getTracks().forEach((track) => track.stop())
     streamRef.current = null
+  }
+
+  const stopCamera = useCallback(() => {
+    releaseStream()
     setStatus('idle')
   }, [])
 
-  const startCamera = useCallback(async () => {
-    setError(null)
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setError(cameraErrorMessage(null))
-      return
-    }
-    setStatus('starting')
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false,
-      })
-      streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play()
+  // With no deviceId, prefer the back camera (phones); otherwise open that exact camera.
+  const startCamera = useCallback(
+    async (deviceId?: string) => {
+      setError(null)
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError(cameraErrorMessage(null))
+        return
       }
-      setStatus('live')
-    } catch (err) {
-      stopCamera()
-      setError(cameraErrorMessage(err))
-    }
-  }, [stopCamera])
+      // Phones often can't open two cameras at once, so release the current one first.
+      releaseStream()
+      setStatus('starting')
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            ...(deviceId ? { deviceId: { exact: deviceId } } : { facingMode: { ideal: 'environment' } }),
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        })
+        streamRef.current = stream
+        setActiveDeviceId(stream.getVideoTracks()[0]?.getSettings().deviceId ?? null)
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          await videoRef.current.play()
+        }
+        setStatus('live')
+
+        // Device list is only complete once permission has been granted.
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        setCameras(devices.filter((device) => device.kind === 'videoinput'))
+      } catch (err) {
+        stopCamera()
+        setError(cameraErrorMessage(err))
+      }
+    },
+    [stopCamera],
+  )
+
+  const switchCamera = () => {
+    if (cameras.length < 2) return
+    const currentIndex = cameras.findIndex((camera) => camera.deviceId === activeDeviceId)
+    const next = cameras[(currentIndex + 1) % cameras.length]
+    void startCamera(next.deviceId)
+  }
 
   // Release the camera when the component unmounts (e.g. switching tabs).
   useEffect(() => stopCamera, [stopCamera])
@@ -123,6 +151,18 @@ export default function CameraCapture({ disabled, onCapture }: CameraCaptureProp
             </button>
             <button
               type="button"
+              onClick={switchCamera}
+              disabled={cameras.length < 2}
+              title={cameras.length < 2 ? 'Only one camera was found on this device' : 'Switch to the next camera'}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15m0 5v-5h5" />
+              </svg>
+              Switch camera
+            </button>
+            <button
+              type="button"
               onClick={stopCamera}
               className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
             >
@@ -132,7 +172,7 @@ export default function CameraCapture({ disabled, onCapture }: CameraCaptureProp
         ) : (
           <button
             type="button"
-            onClick={startCamera}
+            onClick={() => void startCamera(activeDeviceId ?? undefined)}
             disabled={status === 'starting'}
             className="rounded-lg bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
           >
