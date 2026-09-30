@@ -1,0 +1,23 @@
+# Render Blueprint: one Docker web service serving the React UI and the FastAPI API.
+services:
+  - type: web
+    name: household-object-ai
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # Secret: entered in the Render dashboard, never committed.
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: LOCAL_CONFIDENCE_THRESHOLD
+        value: "0.70"
+      - key: OPENAI_MODEL
+        value: gpt-4.1-mini
+      # Keep CPU inference memory low on the 512 MB free instance.
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: MALLOC_ARENA_MAX
+        value: "2"

@@ -12,6 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router
 from app.config import Settings, get_settings
@@ -95,6 +96,14 @@ def create_app(
         )
 
     app.include_router(router)
+
+    # Registered last so /api/* and /docs keep priority over the static UI.
+    if settings.frontend_dist is not None:
+        if (settings.frontend_dist / "index.html").is_file():
+            app.mount("/", StaticFiles(directory=settings.frontend_dist, html=True), name="frontend")
+        else:
+            logger.warning("FRONTEND_DIST=%s has no index.html; serving the API only.", settings.frontend_dist)
+
     return app
 
 

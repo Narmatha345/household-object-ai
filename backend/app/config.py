@@ -63,6 +63,10 @@ class Settings:
     model_path: Path = BACKEND_DIR / "models" / "yolo26n.pt"
     household_labels: tuple[str, ...] = DEFAULT_HOUSEHOLD_LABELS
 
+    # Built React app (frontend/dist). When set and present, FastAPI serves it at "/"
+    # so a single deployment hosts both the UI and the API on one origin.
+    frontend_dist: Path | None = None
+
     max_upload_mb: float = 10.0
     cors_origins: tuple[str, ...] = field(
         default=("http://localhost:5173", "http://127.0.0.1:5173")
@@ -77,7 +81,7 @@ class Settings:
         return int(self.max_upload_mb * 1024 * 1024)
 
 
-def _resolve_model_path(raw: str | None) -> Path:
+def _resolve_backend_path(raw: str | None) -> Path:
     if not raw:
         return Settings.model_path
     path = Path(raw)
@@ -96,8 +100,9 @@ def get_settings() -> Settings:
         openai_timeout_seconds=_float_env("OPENAI_TIMEOUT_SECONDS", 30.0),
         openai_image_max_side=int(_float_env("OPENAI_IMAGE_MAX_SIDE", 1024)),
         local_confidence_threshold=threshold,
-        model_path=_resolve_model_path(os.getenv("MODEL_PATH")),
+        model_path=_resolve_backend_path(os.getenv("MODEL_PATH")),
         household_labels=_list_env("HOUSEHOLD_LABELS", DEFAULT_HOUSEHOLD_LABELS),
+        frontend_dist=_resolve_backend_path(os.getenv("FRONTEND_DIST")) if os.getenv("FRONTEND_DIST") else None,
         max_upload_mb=_float_env("MAX_UPLOAD_MB", 10.0),
         cors_origins=_list_env("CORS_ORIGINS", Settings().cors_origins) or ("*",),
     )

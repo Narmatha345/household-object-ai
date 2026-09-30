@@ -215,6 +215,22 @@ implement the `ObjectDetector` protocol in `app/ml/detector.py` and pass it to
 `create_app(detector=...)`. The full guide is in
 [docs/model-training.md](docs/model-training.md).
 
+## Deploying to Render
+
+The repo includes a [render.yaml](render.yaml) Blueprint and a root [Dockerfile](Dockerfile).
+They build **one** web service that serves both the React UI and the API from
+the same HTTPS origin, so there's no CORS setup and phone cameras work.
+
+1. On Render, go to **New → Blueprint** and select this repository.
+2. When prompted, enter `OPENAI_API_KEY`. It's stored as a Render secret, not in git.
+3. Deploy. The first build takes about 10 minutes (CPU-only PyTorch plus the
+   baked-in YOLO26n weights).
+4. Open `https://<service-name>.onrender.com` on your phone.
+
+Free-tier notes: the instance sleeps after about 15 minutes idle, so the first
+request after that takes around a minute. Memory use is about 370 MB of the
+512 MB limit. Stats are in-memory and reset on every restart or redeploy.
+
 ## 14. Future improvements
 
 - Save fallback images and OpenAI labels as a review queue, and use them as
