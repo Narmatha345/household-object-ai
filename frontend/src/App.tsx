@@ -1,23 +1,38 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import AppHeader from './components/AppHeader'
 import CameraCapture from './components/CameraCapture'
 import DetectionResult from './components/DetectionResult'
+import { AlertIcon, CameraIcon, UploadCloudIcon } from './components/Icons'
 import ImageUpload from './components/ImageUpload'
-import LoadingState from './components/LoadingState'
+import LoadingState, { type LoadingPhase } from './components/LoadingState'
+import PipelineCard from './components/PipelineCard'
 import StatsCard from './components/StatsCard'
 import { detectObject, getHealth, getStats, toFriendlyError } from './services/api'
 import type { DetectionResponse, HealthResponse, StatsResponse } from './types/detection'
 
 type InputMode = 'camera' | 'upload'
 
+const TABS: Array<{ id: InputMode; label: string; icon: typeof CameraIcon }> = [
+  { id: 'camera', label: 'Camera', icon: CameraIcon },
+  { id: 'upload', label: 'Upload Photo', icon: UploadCloudIcon },
+]
+
+// Local YOLO answers in well under a second. A request still running after this
+// long is almost certainly waiting on the OpenAI fallback.
+const FALLBACK_HINT_DELAY_MS = 2000
+
 export default function App() {
   const [mode, setMode] = useState<InputMode>('upload')
   const [loading, setLoading] = useState(false)
+  const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>('local')
   const [result, setResult] = useState<DetectionResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [analyzedPreview, setAnalyzedPreview] = useState<string | null>(null)
   const [stats, setStats] = useState<StatsResponse | null>(null)
   const [health, setHealth] = useState<HealthResponse | null>(null)
   const [backendDown, setBackendDown] = useState(false)
+  const [threshold, setThreshold] = useState<number | null>(null)
+  const tabRefs = useRef<Record<InputMode, HTMLButtonElement | null>>({ camera: null, upload: null })
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -43,89 +58,109 @@ export default function App() {
 
   const runDetection = async (image: Blob, filename: string) => {
     setLoading(true)
+    setLoadingPhase('local')
     setError(null)
     setResult(null)
     setAnalyzedPreview(URL.createObjectURL(image))
+    const fallbackHint = window.setTimeout(() => setLoadingPhase('fallback'), FALLBACK_HINT_DELAY_MS)
     try {
-      setResult(await detectObject(image, filename))
+      const response = await detectObject(image, filename)
+      setResult(response)
+      setThreshold(response.confidence_threshold)
     } catch (err) {
       setError(toFriendlyError(err))
     } finally {
+      window.clearTimeout(fallbackHint)
       setLoading(false)
       void refreshStatus()
     }
   }
 
-  const tabClass = (tab: InputMode) =>
-    `flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${
-      mode === tab ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-    }`
+  const onTabKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+    event.preventDefault()
+    const next: InputMode = mode === 'camera' ? 'upload' : 'camera'
+    setMode(next)
+    tabRefs.current[next]?.focus()
+  }
+
+  const thresholdPercent = threshold === null ? null : Math.round(threshold * 100)
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Household Object AI</h1>
-        <p className="mt-1 text-slate-600">Local-first object detection with AI fallback</p>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          {backendDown ? (
-            <span className="rounded-full bg-red-100 px-2.5 py-1 font-medium text-red-700">Backend unavailable</span>
-          ) : health ? (
-            <>
-              <span
-                className={`rounded-full px-2.5 py-1 font-medium ${
-                  health.local_model_loaded ? 'bg-teal-100 text-teal-800' : 'bg-amber-100 text-amber-800'
-                }`}
-              >
-                Local model {health.local_model_loaded ? 'loaded' : 'not loaded'}
-              </span>
-              <span
-                className={`rounded-full px-2.5 py-1 font-medium ${
-                  health.openai_fallback_configured ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-800'
-                }`}
-              >
-                OpenAI fallback {health.openai_fallback_configured ? 'configured' : 'not configured'}
-              </span>
-            </>
-          ) : null}
-        </div>
-      </header>
+    <div className="min-h-screen">
+      <AppHeader
+        health={health}
+        backendDown={backendDown}
+        confidenceThreshold={threshold}
+        onRefreshStatus={() => void refreshStatus()}
+      />
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <main className="space-y-6">
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-5 flex gap-1 rounded-xl bg-slate-100 p-1" role="tablist">
-              <button type="button" role="tab" aria-selected={mode === 'camera'} className={tabClass('camera')} onClick={() => setMode('camera')}>
-                Camera
-              </button>
-              <button type="button" role="tab" aria-selected={mode === 'upload'} className={tabClass('upload')} onClick={() => setMode('upload')}>
-                Upload Photo
-              </button>
+      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] lg:px-8">
+        <main className="flex min-w-0 flex-col gap-6">
+          <section className="card p-4 sm:p-6" aria-label="Detection workspace">
+            <div
+              role="tablist"
+              aria-label="Image input method"
+              onKeyDown={onTabKeyDown}
+              className="mb-5 grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1"
+            >
+              {TABS.map(({ id, label, icon: Icon }) => {
+                const selected = mode === id
+                return (
+                  <button
+                    key={id}
+                    ref={(el) => {
+                      tabRefs.current[id] = el
+                    }}
+                    type="button"
+                    role="tab"
+                    id={`tab-${id}`}
+                    aria-selected={selected}
+                    aria-controls={`panel-${id}`}
+                    tabIndex={selected ? 0 : -1}
+                    onClick={() => setMode(id)}
+                    className={`focus-ring flex items-center justify-center gap-2 rounded-md px-3 py-2.5 text-sm font-semibold transition-colors ${
+                      selected
+                        ? 'bg-white text-blue-700 shadow-sm ring-1 ring-blue-200'
+                        : 'text-slate-500 hover:bg-white/60 hover:text-slate-800'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {label}
+                  </button>
+                )
+              })}
             </div>
 
-            {mode === 'camera' ? (
-              <CameraCapture disabled={loading} onCapture={(blob) => runDetection(blob, 'camera-capture.jpg')} />
-            ) : (
-              <ImageUpload disabled={loading} onDetect={(file) => runDetection(file, file.name)} />
-            )}
+            <div role="tabpanel" id={`panel-${mode}`} aria-labelledby={`tab-${mode}`}>
+              {mode === 'camera' ? (
+                <CameraCapture disabled={loading} onCapture={(blob) => runDetection(blob, 'camera-capture.jpg')} />
+              ) : (
+                <ImageUpload disabled={loading} onDetect={(file) => runDetection(file, file.name)} />
+              )}
+            </div>
           </section>
 
           {(loading || result || error) && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-live="polite">
-              <h2 className="mb-4 text-lg font-semibold">Result</h2>
-              <div className="flex flex-col gap-5 sm:flex-row">
+            <section className="card p-4 sm:p-6" aria-live="polite" aria-label="Detection result">
+              <div className="flex flex-col gap-5 sm:flex-row sm:gap-6">
                 {analyzedPreview && (
                   <img
                     src={analyzedPreview}
-                    alt="Analyzed image"
-                    className="h-32 w-full rounded-lg object-cover sm:w-44"
+                    alt="Image that was analyzed"
+                    className="h-44 w-full shrink-0 rounded-lg border border-slate-200 bg-slate-50 object-cover sm:h-36 sm:w-48"
                   />
                 )}
-                <div className="flex-1">
-                  {loading && <LoadingState />}
+                <div className="min-w-0 flex-1">
+                  {loading && <LoadingState phase={loadingPhase} />}
                   {error && (
-                    <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-                      {error}
-                    </p>
+                    <div role="alert" className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+                      <AlertIcon className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+                      <div>
+                        <p className="text-sm font-semibold text-red-800">Detection failed</p>
+                        <p className="mt-0.5 text-sm text-red-700">{error}</p>
+                      </div>
+                    </div>
                   )}
                   {result && <DetectionResult result={result} />}
                 </div>
@@ -134,19 +169,9 @@ export default function App() {
           )}
         </main>
 
-        <aside className="space-y-6">
+        <aside className="flex min-w-0 flex-col gap-6" aria-label="Statistics and pipeline">
           <StatsCard stats={stats} />
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">
-            <h2 className="mb-2 font-semibold text-slate-700">How it works</h2>
-            <ol className="list-decimal space-y-1 pl-5">
-              <li>Your image is analyzed by the local YOLO model first.</li>
-              <li>
-                If confidence is at least {Math.round((result?.confidence_threshold ?? 0.7) * 100)}%, the local
-                result is returned.
-              </li>
-              <li>Otherwise the image is sent to OpenAI as a fallback.</li>
-            </ol>
-          </section>
+          <PipelineCard thresholdPercent={thresholdPercent} lastSource={result?.source ?? null} />
         </aside>
       </div>
     </div>

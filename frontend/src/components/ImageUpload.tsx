@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
+import { useEffect, useId, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent } from 'react'
+import { AlertIcon, ImagePlusIcon, InfoIcon, RefreshIcon, ScanIcon, XIcon } from './Icons'
 
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const ACCEPT_ATTR = '.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp'
@@ -9,8 +10,12 @@ interface ImageUploadProps {
   onDetect: (file: File) => void
 }
 
+const formatSize = (bytes: number) =>
+  bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+
 export default function ImageUpload({ disabled, onDetect }: ImageUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const hintId = useId()
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -41,6 +46,14 @@ export default function ImageUpload({ disabled, onDetect }: ImageUploadProps) {
     setPreviewUrl(URL.createObjectURL(candidate))
   }
 
+  const clearSelection = () => {
+    setFile(null)
+    setPreviewUrl(null)
+    setError(null)
+  }
+
+  const openPicker = () => inputRef.current?.click()
+
   const onChange = (event: ChangeEvent<HTMLInputElement>) => {
     selectFile(event.target.files?.[0])
     event.target.value = ''
@@ -52,60 +65,121 @@ export default function ImageUpload({ disabled, onDetect }: ImageUploadProps) {
     selectFile(event.dataTransfer.files?.[0])
   }
 
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      openPicker()
+    }
+  }
+
+  const detect = () => {
+    if (!file) return
+    onDetect(file)
+    // Reset for the next photo; the result panel keeps its own preview.
+    setFile(null)
+    setPreviewUrl(null)
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-5">
       <div
         role="button"
         tabIndex={0}
-        onClick={() => inputRef.current?.click()}
-        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && inputRef.current?.click()}
+        aria-label={file ? `Selected image ${file.name}. Press Enter to choose a different photo.` : 'Choose a photo to upload'}
+        aria-describedby={hintId}
+        onClick={openPicker}
+        onKeyDown={onKeyDown}
         onDragOver={(e) => {
           e.preventDefault()
           setDragging(true)
         }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
-        className={`relative flex aspect-video cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition ${
-          dragging ? 'border-teal-600 bg-teal-50' : 'border-slate-300 bg-white hover:border-slate-400'
+        className={`focus-ring group relative flex aspect-[4/3] cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition-colors sm:aspect-video ${
+          dragging
+            ? 'border-blue-500 bg-blue-50'
+            : previewUrl
+              ? 'border-slate-200 bg-slate-50'
+              : 'border-slate-200 bg-slate-50/60 hover:border-blue-300 hover:bg-blue-50/40'
         }`}
       >
-        {previewUrl ? (
-          <img src={previewUrl} alt="Selected upload preview" className="h-full w-full object-contain" />
+        {previewUrl && file ? (
+          <>
+            <img src={previewUrl} alt="Selected upload preview" className="h-full w-full object-contain" />
+            <div className="absolute right-3 top-3 flex gap-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  openPicker()
+                }}
+                className="btn-secondary px-3 py-1.5 text-xs shadow-sm"
+              >
+                <RefreshIcon className="h-3.5 w-3.5" />
+                Change
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  clearSelection()
+                }}
+                aria-label="Remove selected image"
+                className="btn-secondary px-3 py-1.5 text-xs shadow-sm hover:text-red-600"
+              >
+                <XIcon className="h-3.5 w-3.5" />
+                Remove
+              </button>
+            </div>
+            <span className="absolute bottom-3 left-3 max-w-[70%] truncate rounded-md bg-white/95 px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200">
+              {file.name} · {formatSize(file.size)}
+            </span>
+          </>
         ) : (
-          <div className="flex flex-col items-center gap-2 px-4 text-center text-slate-500">
-            <svg viewBox="0 0 24 24" className="h-10 w-10" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />
-            </svg>
-            <span className="text-sm font-medium">Click to choose a photo, or drag it here</span>
-            <span className="text-xs">JPG, JPEG, PNG or WEBP · up to 10 MB</span>
+          <div className="pointer-events-none flex flex-col items-center gap-4 px-6 text-center">
+            <span className="relative flex h-20 w-20 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 shadow-sm transition-colors group-hover:text-blue-500">
+              <ImagePlusIcon className="h-9 w-9" />
+            </span>
+            <div>
+              <p className="font-semibold text-slate-800">
+                {dragging ? 'Drop the image to upload' : 'Click to choose a photo, or drag it here'}
+              </p>
+              <p className="mt-1 text-sm text-slate-500">Supports JPG, JPEG, PNG or WEBP • Up to 10 MB</p>
+            </div>
           </div>
         )}
       </div>
 
-      <input ref={inputRef} type="file" accept={ACCEPT_ATTR} onChange={onChange} className="hidden" />
+      <input
+        ref={inputRef}
+        type="file"
+        accept={ACCEPT_ATTR}
+        onChange={onChange}
+        tabIndex={-1}
+        aria-label="Upload a photo"
+        className="sr-only"
+      />
 
       {error && (
-        <p role="alert" className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          {error}
-        </p>
+        <div role="alert" className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <AlertIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <span>{error}</span>
+        </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          disabled={!file || disabled}
-          onClick={() => {
-            if (!file) return
-            onDetect(file)
-            // Reset for the next photo; the result panel keeps its own preview.
-            setFile(null)
-            setPreviewUrl(null)
-          }}
-          className="rounded-lg bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Detect
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <button type="button" disabled={!file || disabled} onClick={detect} className="btn-primary px-8 py-3 text-base sm:min-w-44">
+          <ScanIcon className="h-5 w-5" />
+          {disabled ? 'Analyzing…' : 'Detect'}
         </button>
-        {file && <span className="truncate text-sm text-slate-500">{file.name}</span>}
+        <div className="hidden h-10 w-px bg-slate-200 sm:block" aria-hidden="true" />
+        <div id={hintId} className="flex items-start gap-2 text-xs text-slate-500">
+          <InfoIcon className="mt-px h-4 w-4 shrink-0 text-slate-400" />
+          <div>
+            <p className="font-semibold text-slate-700">Supported formats</p>
+            <p className="mt-0.5">JPG, JPEG, PNG, WEBP • Max size: 10 MB</p>
+          </div>
+        </div>
       </div>
     </div>
   )

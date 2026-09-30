@@ -9,6 +9,8 @@ export default defineConfig({
     // In dev, /api is proxied to FastAPI so the browser never needs CORS or secrets.
     proxy: {
       '/api': 'http://127.0.0.1:8000',
+      '/docs': 'http://127.0.0.1:8000',
+      '/openapi.json': 'http://127.0.0.1:8000',
     },
   },
 })

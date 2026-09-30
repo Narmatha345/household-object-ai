@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { AlertIcon, CameraIcon, InfoIcon, ScanIcon, SwitchCameraIcon, XIcon } from './Icons'
 
 interface CameraCaptureProps {
   disabled?: boolean
@@ -112,73 +113,104 @@ export default function CameraCapture({ disabled, onCapture }: CameraCaptureProp
     )
   }
 
+  const isLive = status === 'live'
+  const canSwitch = cameras.length > 1
+
   return (
-    <div className="space-y-4">
-      <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-900">
+    <div className="flex flex-col gap-5">
+      <div
+        className={`relative aspect-[4/3] overflow-hidden rounded-xl sm:aspect-video ${
+          isLive ? 'bg-slate-900' : 'border-2 border-dashed border-slate-200 bg-slate-50/60'
+        }`}
+      >
         <video
           ref={videoRef}
           playsInline
           muted
-          className={`h-full w-full object-cover ${status === 'live' ? '' : 'hidden'}`}
+          aria-label="Live camera preview"
+          className={`h-full w-full object-cover ${isLive ? '' : 'hidden'}`}
         />
-        {status !== 'live' && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-400">
-            <svg viewBox="0 0 24 24" className="h-10 w-10" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M3 8a2 2 0 0 1 2-2h2l1.5-2h7L17 6h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-              <circle cx="12" cy="13" r="3.5" />
-            </svg>
-            <span className="text-sm">{status === 'starting' ? 'Starting camera…' : 'Camera is off'}</span>
+
+        {isLive && (
+          <span className="badge absolute left-3 top-3 bg-slate-900/70 text-white backdrop-blur">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-500" aria-hidden="true" />
+            Live
+          </span>
+        )}
+
+        {!isLive && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center">
+            <span className="flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 shadow-sm">
+              <CameraIcon className="h-8 w-8" />
+            </span>
+            <div>
+              <p className="font-semibold text-slate-800">
+                {status === 'starting' ? 'Starting camera…' : 'Camera is off'}
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                {status === 'starting'
+                  ? 'Allow camera access if your browser asks.'
+                  : 'Start the camera, frame a household object, then capture.'}
+              </p>
+            </div>
+            {status === 'idle' && (
+              <button
+                type="button"
+                onClick={() => void startCamera(activeDeviceId ?? undefined)}
+                className="btn-primary"
+              >
+                <CameraIcon className="h-4 w-4" />
+                Start camera
+              </button>
+            )}
           </div>
         )}
       </div>
 
       {error && (
-        <p role="alert" className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          {error}
-        </p>
+        <div role="alert" className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <AlertIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <span>{error}</span>
+        </div>
       )}
 
-      <div className="flex flex-wrap gap-3">
-        {status === 'live' ? (
-          <>
-            <button
-              type="button"
-              onClick={capture}
-              disabled={disabled}
-              className="rounded-lg bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Capture &amp; detect
-            </button>
-            <button
-              type="button"
-              onClick={switchCamera}
-              disabled={cameras.length < 2}
-              title={cameras.length < 2 ? 'Only one camera was found on this device' : 'Switch to the next camera'}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15m0 5v-5h5" />
-              </svg>
-              Switch camera
-            </button>
-            <button
-              type="button"
-              onClick={stopCamera}
-              className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
-            >
-              Stop camera
-            </button>
-          </>
-        ) : (
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div className="flex flex-wrap gap-3">
           <button
             type="button"
-            onClick={() => void startCamera(activeDeviceId ?? undefined)}
-            disabled={status === 'starting'}
-            className="rounded-lg bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
+            onClick={capture}
+            disabled={!isLive || disabled}
+            className="btn-primary px-7 py-3 text-base"
           >
-            Start camera
+            <ScanIcon className="h-5 w-5" />
+            {disabled ? 'Analyzing…' : 'Capture & detect'}
           </button>
-        )}
+          {isLive && (
+            <>
+              <button
+                type="button"
+                onClick={switchCamera}
+                disabled={!canSwitch}
+                aria-label="Switch camera"
+                title={canSwitch ? 'Switch to the next camera' : 'Only one camera was found on this device'}
+                className="btn-secondary"
+              >
+                <SwitchCameraIcon className="h-4 w-4" />
+                <span className="hidden sm:inline">Switch</span>
+              </button>
+              <button type="button" onClick={stopCamera} aria-label="Stop camera" className="btn-secondary">
+                <XIcon className="h-4 w-4" />
+                <span className="hidden sm:inline">Stop</span>
+              </button>
+            </>
+          )}
+        </div>
+        <p className="flex items-start gap-2 text-xs leading-relaxed text-slate-500 sm:ml-auto sm:max-w-56">
+          <InfoIcon className="mt-px h-4 w-4 shrink-0 text-slate-400" />
+          {isLive && !canSwitch
+            ? 'Only one camera found. Switching works on phones or with a USB webcam.'
+            : 'The captured frame is checked by local ML first.'}
+        </p>
       </div>
     </div>
   )
