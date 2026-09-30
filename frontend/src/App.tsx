@@ -62,7 +62,9 @@ export default function App() {
     setError(null)
     setResult(null)
     setAnalyzedPreview(URL.createObjectURL(image))
-    const fallbackHint = window.setTimeout(() => setLoadingPhase('fallback'), FALLBACK_HINT_DELAY_MS)
+    // Without a configured fallback a slow request can only be a slow local model.
+    const slowPhase: LoadingPhase = health?.openai_fallback_configured ? 'fallback' : 'slow'
+    const fallbackHint = window.setTimeout(() => setLoadingPhase(slowPhase), FALLBACK_HINT_DELAY_MS)
     try {
       const response = await detectObject(image, filename)
       setResult(response)

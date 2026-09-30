@@ -8,7 +8,8 @@ import type {
 
 const client = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
-  timeout: 60_000,
+  // Generous: CPU-only hosts (e.g. Render free tier) can take ~1 minute per image.
+  timeout: 150_000,
 })
 
 export async function detectObject(image: Blob, filename: string): Promise<DetectionResponse> {

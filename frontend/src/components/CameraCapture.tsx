@@ -175,12 +175,12 @@ export default function CameraCapture({ disabled, onCapture }: CameraCaptureProp
       )}
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="flex flex-wrap gap-3">
+        <div className="flex gap-3">
           <button
             type="button"
             onClick={capture}
             disabled={!isLive || disabled}
-            className="btn-primary px-7 py-3 text-base"
+            className="btn-primary flex-1 whitespace-nowrap px-5 py-3 text-base sm:flex-none sm:px-7"
           >
             <ScanIcon className="h-5 w-5" />
             {disabled ? 'Analyzing…' : 'Capture & detect'}

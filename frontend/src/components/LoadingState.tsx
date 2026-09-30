@@ -1,4 +1,4 @@
-export type LoadingPhase = 'local' | 'fallback'
+export type LoadingPhase = 'local' | 'fallback' | 'slow'
 
 interface LoadingStateProps {
   phase?: LoadingPhase
@@ -13,11 +13,15 @@ const COPY: Record<LoadingPhase, { title: string; detail: string }> = {
     title: 'Checking with AI fallback...',
     detail: 'Local model could not confidently identify the object.',
   },
+  slow: {
+    title: 'Still analyzing...',
+    detail: 'Local ML is taking longer than usual on this server. Please keep this page open.',
+  },
 }
 
 export default function LoadingState({ phase = 'local' }: LoadingStateProps) {
   const copy = COPY[phase]
-  const spinnerColor = phase === 'local' ? 'border-t-blue-600' : 'border-t-violet-600'
+  const spinnerColor = phase === 'fallback' ? 'border-t-violet-600' : 'border-t-blue-600'
 
   return (
     <div role="status" aria-live="polite" className="flex items-start gap-4 py-2">
