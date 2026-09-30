@@ -94,7 +94,13 @@ export default function ImageUpload({ disabled, onDetect }: ImageUploadProps) {
         <button
           type="button"
           disabled={!file || disabled}
-          onClick={() => file && onDetect(file)}
+          onClick={() => {
+            if (!file) return
+            onDetect(file)
+            // Reset for the next photo; the result panel keeps its own preview.
+            setFile(null)
+            setPreviewUrl(null)
+          }}
           className="rounded-lg bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Detect
