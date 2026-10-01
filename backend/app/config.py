@@ -63,6 +63,13 @@ class Settings:
 
     local_confidence_threshold: float = 0.70
     model_path: Path = DEFAULT_MODEL_PATH
+    # YOLO input size (imgsz). 480 is ~40% faster than 640 on CPU.
+    inference_image_size: int = 480
+    # A .onnx MODEL_PATH runs on ONNX Runtime (no torch import, ~3x less memory).
+    # If it fails to load, this PyTorch model is loaded instead.
+    fallback_model_path: Path | None = None
+    # CPU threads for inference; None = library default (all cores).
+    inference_threads: int | None = None
     household_labels: tuple[str, ...] = DEFAULT_HOUSEHOLD_LABELS
 
     # Built React app (frontend/dist). When set and present, FastAPI serves it at "/"
@@ -103,6 +110,9 @@ def get_settings() -> Settings:
         openai_image_max_side=int(_float_env("OPENAI_IMAGE_MAX_SIDE", 1024)),
         local_confidence_threshold=threshold,
         model_path=_resolve_backend_path(os.getenv("MODEL_PATH")),
+        inference_image_size=int(_float_env("INFERENCE_IMAGE_SIZE", 480)),
+        fallback_model_path=_resolve_backend_path(os.getenv("FALLBACK_MODEL_PATH")) if os.getenv("FALLBACK_MODEL_PATH") else None,
+        inference_threads=int(_float_env("INFERENCE_THREADS", 0)) or None,
         household_labels=_list_env("HOUSEHOLD_LABELS", DEFAULT_HOUSEHOLD_LABELS),
         frontend_dist=_resolve_backend_path(os.getenv("FRONTEND_DIST")) if os.getenv("FRONTEND_DIST") else None,
         max_upload_mb=_float_env("MAX_UPLOAD_MB", 10.0),

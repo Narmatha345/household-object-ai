@@ -1,3 +1,10 @@
+---
+title: Household Object AI
+sdk: docker
+app_port: 8000
+pinned: false
+---
+
 # Household Object AI
 
 **Local-first household object detection with an OpenAI fallback.**
@@ -113,12 +120,20 @@ No frontend `.env` is needed for local development. Vite proxies `/api` to
 | `OPENAI_API_KEY` | *(empty)* | Needed for the fallback. Without it, low-confidence images return a 503 |
 | `LOCAL_CONFIDENCE_THRESHOLD` | `0.70` | Minimum local confidence to skip OpenAI |
 | `MODEL_PATH` | `runs/household-yolo26n/weights/best.pt` | Local weights, relative to `backend/` |
+| `INFERENCE_IMAGE_SIZE` | `480` | YOLO input size (`imgsz`); smaller is faster on CPU |
+| `FALLBACK_MODEL_PATH` | *(empty)* | Model loaded if `MODEL_PATH` fails. Docker: `.onnx` primary, `.pt` fallback |
+| `INFERENCE_THREADS` | *(library default)* | CPU threads for inference. Docker sets `1` for small hosts |
 | `OPENAI_MODEL` | `gpt-4.1-mini` | Vision-capable model for the fallback |
 | `OPENAI_TIMEOUT_SECONDS` | `30` | Timeout for the OpenAI request |
 | `OPENAI_IMAGE_MAX_SIDE` | `1024` | Images are downscaled before upload to reduce cost |
 | `HOUSEHOLD_LABELS` | the 15 classes of `best.pt` | Comma-separated allowlist; `*` accepts every model class |
 | `MAX_UPLOAD_MB` | `10` | Upload size limit |
 | `CORS_ORIGINS` | `http://localhost:5173,…` | Allowed browser origins |
+
+A `.onnx` `MODEL_PATH` runs on ONNX Runtime without importing PyTorch (about 3x less
+memory). Re-export it after retraining with
+`yolo export model=models/household-yolo26n.pt format=onnx imgsz=480 dynamic=True simplify=True`,
+then compare it with `python scripts/benchmark_inference.py --images <image>`.
 
 **`frontend/.env`** (optional, and never put secrets here)
 

@@ -67,6 +67,10 @@ class LocalDetectionService:
     def is_available(self) -> bool:
         return self._detector.is_loaded
 
+    def use_detector(self, detector: ObjectDetector) -> None:
+        """Swap in another loaded detector (used when the primary model failed to load)."""
+        self._detector = detector
+
     def detect(self, image: Image.Image) -> LocalDetectionResult:
         inference_start = time.perf_counter()
         raw = self._detector.detect(image)

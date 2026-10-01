@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 
 from fastapi import APIRouter, File, Request, UploadFile
@@ -9,6 +10,7 @@ from app.schemas import DetectionResponse, ErrorResponse, HealthResponse, StatsR
 from app.services.image_input import decode_image, validate_upload_metadata
 
 router = APIRouter(prefix="/api")
+logger = logging.getLogger(__name__)
 
 _ERROR_RESPONSES = {
     code: {"model": ErrorResponse} for code in (400, 413, 415, 500, 502, 503)
@@ -34,7 +36,12 @@ async def detect(request: Request, file: UploadFile = File(...)) -> DetectionRes
 
     # Read at most one byte past the limit so oversized uploads are rejected cheaply.
     data = await file.read(state.settings.max_upload_bytes + 1)
+    decode_start = time.perf_counter()
     image = decode_image(data, state.settings.max_upload_bytes)
+    logger.info(
+        "decode_ms=%.1f bytes=%d image=%dx%d",
+        (time.perf_counter() - decode_start) * 1000, len(data), image.width, image.height,
+    )
 
     # YOLO inference and the OpenAI call are blocking; keep the event loop free.
     return await run_in_threadpool(state.detection_router.detect, image, started)

@@ -41,9 +41,10 @@ class LocalObjectDetector:
     # The reliability threshold is applied later, from configuration.
     _MIN_CANDIDATE_CONFIDENCE = 0.15
 
-    def __init__(self, model_path: Path, device: str | None = None) -> None:
+    def __init__(self, model_path: Path, device: str | None = None, image_size: int = 480) -> None:
         self._model_path = model_path
         self._device = device
+        self._image_size = image_size
         self._model = None
         # Ultralytics predictors are not guaranteed to be thread-safe.
         self._predict_lock = threading.Lock()
@@ -61,8 +62,8 @@ class LocalObjectDetector:
         if self._model is None:
             self._model = load_yolo_model(self._model_path)
             logger.info(
-                "Local model loaded from %s with %d classes: %s",
-                self._model_path, len(self.class_names), self.class_names,
+                "Local model loaded from %s with %d classes (imgsz=%d): %s",
+                self._model_path, len(self.class_names), self._image_size, self.class_names,
             )
 
     def detect(self, image: Image.Image) -> list[RawDetection]:
@@ -74,12 +75,20 @@ class LocalObjectDetector:
                 results = self._model.predict(
                     source=image,
                     conf=self._MIN_CANDIDATE_CONFIDENCE,
+                    imgsz=self._image_size,
                     device=self._device,
                     verbose=False,
                 )
         except Exception as exc:
             logger.exception("Local YOLO inference failed")
             raise LocalInferenceError("Local detection failed for this image.") from exc
+
+        speed = getattr(results[0], "speed", None) if results else None  # per-stage ms from Ultralytics
+        if speed:
+            logger.info(
+                "PyTorch timing: preprocess_ms=%.1f inference_ms=%.1f postprocess_ms=%.1f",
+                speed.get("preprocess") or 0, speed.get("inference") or 0, speed.get("postprocess") or 0,
+            )
 
         # Labels come only from the model's own mapping; nothing is renamed or invented.
         names = self._model.names

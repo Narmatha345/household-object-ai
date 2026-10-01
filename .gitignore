@@ -18,6 +18,7 @@ backend/models/*.onnx
 !backend/models/.gitkeep
 # Trained household model (copy of runs/household-yolo26n/weights/best.pt), shipped for deployment.
 !backend/models/household-yolo26n.pt
+!backend/models/household-yolo26n.onnx
 runs/
 
 # Dataset contents

@@ -1,3 +1,6 @@
 -r requirements.txt
 pytest>=8.0
 httpx>=0.27
+# ONNX export (scripts/benchmark_inference.py, yolo export format=onnx)
+onnx>=1.17
+onnxslim>=0.1

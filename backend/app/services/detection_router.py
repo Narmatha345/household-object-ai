@@ -20,6 +20,13 @@ def _ms_since(start: float) -> float:
     return round((time.perf_counter() - start) * 1000, 2)
 
 
+def _log_timing(source: str, timing: DetectionTiming) -> None:
+    logger.info(
+        "Request timing: source=%s local_inference_ms=%s postprocess_ms=%s openai_ms=%s total_ms=%s",
+        source, timing.local_inference_ms, timing.local_processing_ms, timing.openai_ms, timing.total_ms,
+    )
+
+
 class DetectionRouter:
     def __init__(
         self,
@@ -54,16 +61,18 @@ class DetectionRouter:
                 ", ".join(f"{o.label} {o.confidence:.2f}" for o in local_result.objects),
             )
             self._stats.record_local()
+            timing = DetectionTiming(
+                local_inference_ms=local_result.inference_ms,
+                local_processing_ms=local_result.processing_ms,
+                total_ms=_ms_since(started),
+            )
+            _log_timing("local", timing)
             return DetectionResponse(
                 source="local",
                 objects=local_result.objects,
                 fallback_used=False,
                 confidence_threshold=threshold,
-                timing=DetectionTiming(
-                    local_inference_ms=local_result.inference_ms,
-                    local_processing_ms=local_result.processing_ms,
-                    total_ms=_ms_since(started),
-                ),
+                timing=timing,
             )
 
         # 3. Unreliable -> OpenAI fallback.
@@ -78,6 +87,13 @@ class DetectionRouter:
         openai_ms = _ms_since(openai_start)
 
         self._stats.record_fallback()
+        timing = DetectionTiming(
+            local_inference_ms=local_result.inference_ms,
+            local_processing_ms=local_result.processing_ms,
+            openai_ms=openai_ms,
+            total_ms=_ms_since(started),
+        )
+        _log_timing("openai", timing)
         return DetectionResponse(
             source="openai",
             objects=fallback_result.objects,
@@ -87,10 +103,5 @@ class DetectionRouter:
             reliability_note=fallback_result.reliability_note,
             local_candidates=local_result.candidates,
             confidence_threshold=threshold,
-            timing=DetectionTiming(
-                local_inference_ms=local_result.inference_ms,
-                local_processing_ms=local_result.processing_ms,
-                openai_ms=openai_ms,
-                total_ms=_ms_since(started),
-            ),
+            timing=timing,
         )

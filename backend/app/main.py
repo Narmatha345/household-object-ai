@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -18,6 +19,7 @@ from app.api.routes import router
 from app.config import Settings, get_settings
 from app.errors import AppError, ModelLoadError
 from app.ml.detector import LocalObjectDetector, ObjectDetector
+from app.ml.onnx_detector import OnnxObjectDetector
 from app.services.detection_router import DetectionRouter
 from app.services.local_detection import LocalDetectionService
 from app.services.openai_fallback import FallbackDetector, OpenAIFallbackService
@@ -27,6 +29,31 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 logger = logging.getLogger("household_object_ai")
 
 
+def _build_detector(settings: Settings, model_path: Path) -> LocalObjectDetector | OnnxObjectDetector:
+    """ONNX Runtime for .onnx weights, Ultralytics/PyTorch for everything else."""
+    if model_path.suffix.lower() == ".onnx":
+        return OnnxObjectDetector(
+            model_path, image_size=settings.inference_image_size, threads=settings.inference_threads
+        )
+    return LocalObjectDetector(model_path, image_size=settings.inference_image_size)
+
+
+def _load_with_fallback(
+    detector: LocalObjectDetector | OnnxObjectDetector, settings: Settings
+) -> LocalObjectDetector | OnnxObjectDetector:
+    """Load the configured model; if that fails, try FALLBACK_MODEL_PATH (e.g. the .pt model)."""
+    try:
+        detector.load()
+        return detector
+    except ModelLoadError:
+        if settings.fallback_model_path is None:
+            raise
+        logger.warning("Primary model failed to load; loading fallback model %s", settings.fallback_model_path)
+        fallback_detector = _build_detector(settings, settings.fallback_model_path)
+        fallback_detector.load()
+        return fallback_detector
+
+
 def create_app(
     settings: Settings | None = None,
     detector: ObjectDetector | None = None,
@@ -34,7 +61,7 @@ def create_app(
 ) -> FastAPI:
     """Build the app. Tests inject fake `detector` / `fallback` implementations."""
     settings = settings or get_settings()
-    detector = detector or LocalObjectDetector(settings.model_path)
+    detector = detector or _build_detector(settings, settings.model_path)
     fallback = fallback or OpenAIFallbackService(
         api_key=settings.openai_api_key,
         model=settings.openai_model,
@@ -45,11 +72,13 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         # Load the model once at startup instead of on every request.
-        if isinstance(detector, LocalObjectDetector):
+        if isinstance(detector, (LocalObjectDetector, OnnxObjectDetector)):
             try:
-                detector.load()
-                logger.info("Local model ready: %s", settings.model_path)
-                model_labels = set(detector.class_names.values())
+                active = _load_with_fallback(detector, settings)
+                if active is not detector:
+                    local_service.use_detector(active)
+                logger.info("Local model ready: %s", type(active).__name__)
+                model_labels = set(active.class_names.values())
                 allowed = set(settings.household_labels)
                 if allowed and model_labels != allowed:
                     logger.warning(

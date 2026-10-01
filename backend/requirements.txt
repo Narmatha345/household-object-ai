@@ -5,3 +5,4 @@ pillow>=10.4
 python-dotenv>=1.0
 openai>=1.99
 ultralytics>=8.4.0
+onnxruntime>=1.20
