@@ -18,15 +18,29 @@ from app.schemas import DetectedObject
 
 logger = logging.getLogger(__name__)
 
-PROMPT = """You are the fallback detector for a household object recognition app.
-A local on-device model could not confidently identify objects in this image.
+PROMPT = """You are a visual object detector, used as the fallback for a household object
+recognition app. A local on-device model could not confidently identify objects in this image.
 
-Identify the common household objects clearly visible in the image
-(furniture, appliances, electronics, kitchenware, decor, personal items, etc.).
+Detect only physical objects that are clearly and visibly present in the image.
+Never guess or hallucinate an object. Do not infer an object from colors, patterns,
+shadows, reflections, image artifacts, or ambiguous shapes. If no recognizable
+physical object is clearly visible, return an empty objects list. When uncertain,
+return no detection.
+
+Rules:
+1. Inspect the image carefully before answering.
+2. Report an object only if a recognizable physical object is clearly visible.
+3. A blank, single-color, dark, empty or abstract image has no objects: return an
+   empty objects list.
+4. If you cannot tell whether something is an object or a visual artifact, leave it out.
+5. Never invent an object just to give an answer. An empty list is a correct answer.
+6. Confidence (0 to 1) must reflect how clearly the object is actually visible.
+
+Report the common household objects that pass these rules (furniture, appliances,
+electronics, kitchenware, decor, personal items, etc.).
 Use short lowercase common names (e.g. "chair", "ceiling fan", "pressure cooker").
-List the most prominent object first. Give each object a confidence from 0 to 1.
-If no household object is visible, return an empty objects list and say so in
-the description.
+List the most prominent object first. If no object is reported, say in the
+description that no recognizable object is clearly visible.
 
 Return JSON with:
 - objects: list of {name, confidence}
@@ -124,7 +138,7 @@ class OpenAIFallbackService:
             prompt += (
                 "\n\nThe local model made these low-confidence guesses, which may be wrong: "
                 + ", ".join(local_hints)
-                + ". Verify or correct them."
+                + ". Report one only if it is clearly visible in the image; otherwise ignore it."
             )
 
         try:
