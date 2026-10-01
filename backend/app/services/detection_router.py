@@ -49,6 +49,10 @@ class DetectionRouter:
 
         # 2. Reliable -> return immediately. OpenAI is NOT called.
         if local_result.is_reliable:
+            logger.info(
+                "Route: Local ML (OpenAI not called): %s",
+                ", ".join(f"{o.label} {o.confidence:.2f}" for o in local_result.objects),
+            )
             self._stats.record_local()
             return DetectionResponse(
                 source="local",
@@ -64,6 +68,7 @@ class DetectionRouter:
 
         # 3. Unreliable -> OpenAI fallback.
         hints = [c.label for c in local_result.candidates]
+        logger.info("Route: OpenAI fallback because %s", local_result.unreliable_reason)
         openai_start = time.perf_counter()
         try:
             fallback_result = self._fallback.detect(image, local_hints=hints or None)

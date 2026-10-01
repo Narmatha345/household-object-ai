@@ -33,12 +33,12 @@ RUN pip install -r requirements.txt
 
 COPY backend/app ./app
 
-# Bake the pretrained weights into the image so startup needs no download.
-RUN mkdir -p models && python -c "from ultralytics import YOLO; YOLO('models/yolo26n.pt')"
+# Trained household model (15 classes), a copy of runs/household-yolo26n/weights/best.pt.
+COPY backend/models/household-yolo26n.pt ./models/household-yolo26n.pt
 
 COPY --from=frontend /frontend/dist /app/frontend/dist
 ENV FRONTEND_DIST=/app/frontend/dist \
-    MODEL_PATH=models/yolo26n.pt
+    MODEL_PATH=models/household-yolo26n.pt
 
 EXPOSE 8000
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

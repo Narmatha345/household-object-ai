@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass, field
 
 from PIL import Image
 
+from app.config import UNVALIDATED_LABELS
 from app.ml.detector import ObjectDetector, RawDetection
 from app.schemas import DetectedObject
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -23,6 +27,19 @@ class LocalDetectionResult:
 
 def _elapsed_ms(start: float) -> float:
     return round((time.perf_counter() - start) * 1000, 2)
+
+
+def _all_instances(detections: list[RawDetection]) -> list[DetectedObject]:
+    """Every detection as its own object (no per-class merging), highest confidence first."""
+    ranked = sorted(detections, key=lambda det: det.confidence, reverse=True)
+    return [
+        DetectedObject(
+            label=det.label,
+            confidence=round(det.confidence, 4),
+            box=list(det.box) if det.box is not None else None,
+        )
+        for det in ranked
+    ]
 
 
 def _best_per_label(detections: list[RawDetection]) -> list[DetectedObject]:
@@ -63,13 +80,29 @@ class LocalDetectionService:
 
     def _evaluate(self, raw: list[RawDetection]) -> LocalDetectionResult:
         if self._allowed:
+            dropped = sorted({d.label for d in raw if d.label.lower() not in self._allowed})
+            if dropped:
+                logger.warning("Dropped labels outside the allowed classes: %s", ", ".join(dropped))
             raw = [d for d in raw if d.label.lower() in self._allowed]
+
+        for label in sorted({d.label for d in raw if d.label.lower() in UNVALIDATED_LABELS}):
+            logger.warning("'%s' was detected but this class had no training data; treat it as unvalidated.", label)
 
         confident = [d for d in raw if d.confidence >= self.confidence_threshold]
         weak = [d for d in raw if d.confidence < self.confidence_threshold]
+        top = max(raw, key=lambda d: d.confidence, default=None)
+        logger.info(
+            "Local result: %d allowed detection(s), top=%s, threshold=%.2f -> %s",
+            len(raw),
+            f"{top.label} {top.confidence:.2f}" if top else "none",
+            self.confidence_threshold,
+            "reliable" if confident else "unreliable",
+        )
 
+        # Reliable iff the highest-confidence allowed detection reaches the threshold.
+        # Every detection at or above the threshold is returned, including repeated classes.
         if confident:
-            return LocalDetectionResult(is_reliable=True, objects=_best_per_label(confident))
+            return LocalDetectionResult(is_reliable=True, objects=_all_instances(confident))
 
         reason = (
             "no household object was detected by the local model"

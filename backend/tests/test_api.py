@@ -28,8 +28,8 @@ def test_reliable_local_detection_does_not_call_openai(client, detector, fallbac
     detector.detections = [
         RawDetection("chair", 0.91),
         RawDetection("chair", 0.80),
-        RawDetection("cup", 0.75),
-        RawDetection("book", 0.40),  # below threshold, ignored
+        RawDetection("bottle", 0.75),
+        RawDetection("laptop", 0.40),  # below threshold, ignored
     ]
     response = upload(client, make_image_bytes())
     body = response.json()
@@ -38,14 +38,38 @@ def test_reliable_local_detection_does_not_call_openai(client, detector, fallbac
     assert body["source"] == "local"
     assert body["fallback_used"] is False
     assert body["objects"] == [
-        {"label": "chair", "confidence": 0.91},
-        {"label": "cup", "confidence": 0.75},
+        {"label": "chair", "confidence": 0.91, "box": None},
+        {"label": "chair", "confidence": 0.80, "box": None},  # separate instance, not merged
+        {"label": "bottle", "confidence": 0.75, "box": None},
     ]
     assert fallback.calls == 0
 
 
+def test_all_local_detections_above_threshold_are_returned(client, detector, fallback):
+    detector.detections = [
+        RawDetection("table", 0.90, (10.0, 20.0, 300.0, 200.0)),
+        RawDetection("sofa", 0.87),
+        RawDetection("ceiling fan", 0.72),
+        RawDetection("chair", 0.81),
+        RawDetection("bed", 0.76),
+        RawDetection("cupboard", 0.68),  # below 70%, excluded
+    ]
+    body = upload(client, make_image_bytes()).json()
+
+    assert body["source"] == "local"
+    assert [(o["label"], o["confidence"]) for o in body["objects"]] == [
+        ("table", 0.90),
+        ("sofa", 0.87),
+        ("chair", 0.81),
+        ("bed", 0.76),
+        ("ceiling fan", 0.72),
+    ]
+    assert body["objects"][0]["box"] == [10.0, 20.0, 300.0, 200.0]
+    assert fallback.calls == 0
+
+
 def test_low_confidence_triggers_fallback(client, detector, fallback):
-    detector.detections = [RawDetection("couch", 0.42)]
+    detector.detections = [RawDetection("sofa", 0.42)]
     response = upload(client, make_image_bytes())
     body = response.json()
 
@@ -54,9 +78,9 @@ def test_low_confidence_triggers_fallback(client, detector, fallback):
     assert body["fallback_used"] is True
     assert "below the 70% threshold" in body["fallback_reason"]
     assert body["objects"][0]["label"] == "ceiling fan"
-    assert body["local_candidates"] == [{"label": "couch", "confidence": 0.42}]
+    assert body["local_candidates"] == [{"label": "sofa", "confidence": 0.42, "box": None}]
     assert fallback.calls == 1
-    assert fallback.last_hints == ["couch"]
+    assert fallback.last_hints == ["sofa"]
     # Local model always runs first.
     assert detector.calls == 1
 
@@ -74,6 +98,20 @@ def test_non_household_label_is_not_reliable(client, detector, fallback):
     body = upload(client, make_image_bytes()).json()
     assert body["source"] == "openai"
     assert fallback.calls == 1
+
+
+def test_labels_outside_trained_classes_are_never_returned_locally(client, detector, fallback):
+    detector.detections = [
+        RawDetection("refrigerator", 0.92),
+        RawDetection("couch", 0.88),
+        RawDetection("potted plant", 0.70),
+        RawDetection("sofa", 0.86),
+    ]
+    body = upload(client, make_image_bytes()).json()
+
+    assert body["source"] == "local"
+    assert [o["label"] for o in body["objects"]] == ["refrigerator", "sofa"]
+    assert fallback.calls == 0
 
 
 def test_openai_fallback_failure_returns_clean_error(client, detector, fallback):

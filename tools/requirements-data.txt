@@ -1,0 +1,6 @@
+# Data-preparation only. NOT used by the backend or the Render image.
+# Install into a separate env:  python -m venv .venv-data && .venv-data\Scripts\pip install -r tools/requirements-data.txt
+pyyaml>=6.0
+pillow>=10.4
+imagehash>=4.3        # near-duplicate detection across train/val (05, 06)
+ultralytics>=8.4.0    # 06_audit.py only: flags probable missing labels with the current YOLO26n

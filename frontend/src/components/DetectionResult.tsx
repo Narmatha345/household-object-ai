@@ -55,14 +55,29 @@ function TimingPanel({ timing, fallbackUsed }: { timing: DetectionTiming; fallba
   )
 }
 
+/** Display names that number repeated classes: "Chair 1", "Chair 2"; single instances stay "Chair". */
+function instanceLabels(objects: DetectedObject[]): string[] {
+  const totals = new Map<string, number>()
+  objects.forEach((obj) => totals.set(obj.label, (totals.get(obj.label) ?? 0) + 1))
+  const seen = new Map<string, number>()
+  return objects.map((obj) => {
+    const n = (seen.get(obj.label) ?? 0) + 1
+    seen.set(obj.label, n)
+    return (totals.get(obj.label) ?? 0) > 1 ? `${capitalize(obj.label)} ${n}` : capitalize(obj.label)
+  })
+}
+
 function ObjectList({ title, objects, barClass }: { title: string; objects: DetectedObject[]; barClass: string }) {
+  const names = instanceLabels(objects)
   return (
     <div>
-      <h3 className="text-sm font-semibold text-slate-700">{title}</h3>
+      <h3 className="text-sm font-semibold text-slate-700">
+        {title} <span className="font-normal text-slate-400">({objects.length})</span>
+      </h3>
       <ul className="mt-2 divide-y divide-slate-100 rounded-lg border border-slate-200">
-        {objects.map((obj) => (
-          <li key={obj.label} className="flex items-center gap-4 px-4 py-2.5 text-sm">
-            <span className="min-w-0 flex-1 truncate text-slate-800">{capitalize(obj.label)}</span>
+        {objects.map((obj, index) => (
+          <li key={`${obj.label}-${index}`} className="flex items-center gap-4 px-4 py-2.5 text-sm">
+            <span className="min-w-0 flex-1 truncate text-slate-800">{names[index]}</span>
             {obj.confidence !== null && (
               <span className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-slate-100 sm:block" aria-hidden="true">
                 <span className={`block h-full rounded-full ${barClass}`} style={{ width: `${obj.confidence * 100}%` }} />
@@ -155,7 +170,7 @@ export default function DetectionResult({ result }: DetectionResultProps) {
         </div>
       )}
 
-      {result.objects.length > 1 && (
+      {result.objects.length > 0 && (
         <ObjectList
           title="All detected objects"
           objects={result.objects}

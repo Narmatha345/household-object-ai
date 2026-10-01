@@ -14,6 +14,9 @@ class DetectedObject(BaseModel):
     confidence: float | None = Field(
         default=None, ge=0.0, le=1.0, description="0-1 score; None when the source gives none"
     )
+    box: list[float] | None = Field(
+        default=None, description="Bounding box [x1, y1, x2, y2] in image pixels; local detections only"
+    )
 
 
 class DetectionTiming(BaseModel):

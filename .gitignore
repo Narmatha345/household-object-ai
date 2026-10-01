@@ -16,6 +16,8 @@ venv/
 backend/models/*.pt
 backend/models/*.onnx
 !backend/models/.gitkeep
+# Trained household model (copy of runs/household-yolo26n/weights/best.pt), shipped for deployment.
+!backend/models/household-yolo26n.pt
 runs/
 
 # Dataset contents
@@ -26,6 +28,11 @@ data/household/labels/*/*
 !data/household/images/*/.gitkeep
 !data/household/labels/*/.gitkeep
 data/household/**/*.cache
+data/household/ATTRIBUTION.csv
+# Downloaded metadata, raw images and intermediate build files
+data/_cache/
+data/eval/
+.venv-data/
 
 # Node
 node_modules/

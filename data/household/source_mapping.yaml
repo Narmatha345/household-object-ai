@@ -6,7 +6,7 @@
 # uses only the entries whose names appear in data.yaml. Names must match exactly.
 
 bed:             { coco: [bed], open_images: [Bed] }
-sofa:            { coco: [couch], open_images: [Couch] }
+sofa:            { coco: [couch], open_images: [Couch, Sofa bed, Studio couch, Loveseat] }
 chair:           { coco: [chair], open_images: [Chair] }
 table:           { coco: [dining table], open_images: [Table, "Kitchen & dining room table", Coffee table, Desk] }
 tv:              { coco: [tv], open_images: [Television] }
@@ -22,7 +22,7 @@ washing machine: { open_images: [Washing machine], custom: true }
 ceiling fan:     { open_images: [Ceiling fan], custom: true }
 fan:             { open_images: [Mechanical fan] }
 lamp:            { open_images: [Lamp] }
-cupboard:        { open_images: [Cupboard, Cabinetry, Wardrobe, Closet], custom: true }
+cupboard:        { open_images: [Cupboard, Cabinetry, Wardrobe, Closet, Bathroom cabinet], custom: true }
 door:            { open_images: [Door] }
 window:          { open_images: [Window] }
 mirror:          { open_images: [Mirror] }
@@ -45,10 +45,42 @@ sink:            { coco: [sink], open_images: [Sink] }
 toilet:          { coco: [toilet], open_images: [Toilet] }
 mixer grinder:   { custom: true }
 bucket:          { custom: true }
-person:          { coco: [person] }
+# Open Images boxes people with the most specific label, so Man/Woman/Boy/Girl are needed.
+person:          { coco: [person], open_images: [Person, Man, Woman, Boy, Girl] }
 cat:             { coco: [cat] }
 dog:             { coco: [dog] }
 
 # Build rules (see docs/household-model-plan.md, Phase 3):
 max_boxes_per_class: 1500
 exclude_open_images_flags: [IsDepiction, IsGroupOf]
+
+# ---- V1 build (tools/dataset/, Open Images only) ----
+# Generic or overlapping OI labels. An image with one of these boxes that does
+# NOT overlap (IoU >= 0.5) a mapped V1 box is dropped: the object is probably a
+# V1 class that was only labelled generically (e.g. a stove boxed as "Oven").
+v1_open_images_conflict_classes:
+  [Home appliance, Kitchen appliance, Furniture, Oven, Mechanical fan, Wine, Beer]
+# Indoor OI classes used to find background images (no V1 object present).
+v1_open_images_background_classes:
+  [Shelf, Bookcase, Curtain, Houseplant, Picture frame, Pillow, Lamp]
+# Images selected per class (train + val combined; the build step splits 85/15).
+v1_targets:
+  bed: 720
+  sofa: 720
+  chair: 720
+  table: 720
+  tv: 720
+  laptop: 720
+  refrigerator: 720
+  microwave: 720
+  washing machine: 720
+  ceiling fan: 720      # takes all available (~500 expected)
+  cupboard: 720
+  gas stove: 720        # takes all available (~800 expected)
+  pressure cooker: 0    # custom photos only
+  bottle: 480
+  person: 360
+  background: 360
+# Box filters applied at build time (pixel size needs the downloaded image).
+min_box_area_fraction: 0.01
+min_box_side_px: 16

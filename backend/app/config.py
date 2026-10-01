@@ -17,19 +17,21 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(BACKEND_DIR / ".env")
 
-# COCO classes that are commonly found in a house. Detections outside this set
-# are ignored by the local detector so that, e.g., an "airplane" false positive
-# on a ceiling fan does not count as a reliable household detection.
+# Trained household model (YOLO26n fine-tuned on data/household, V1).
+DEFAULT_MODEL_PATH = BACKEND_DIR / "runs" / "household-yolo26n" / "weights" / "best.pt"
+
+# The exact 15 classes of best.pt (model.names). Local detections with any other
+# label are dropped, so stray labels such as "couch" or "potted plant" can never
+# be returned as a local result.
 DEFAULT_HOUSEHOLD_LABELS: tuple[str, ...] = (
-    "person", "cat", "dog", "backpack", "umbrella", "handbag", "suitcase",
-    "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl",
-    "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "pizza",
-    "donut", "cake", "chair", "couch", "potted plant", "bed", "dining table",
-    "toilet", "tv", "laptop", "mouse", "remote", "keyboard", "cell phone",
-    "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock",
-    "vase", "scissors", "teddy bear", "hair drier", "toothbrush", "bicycle",
-    "sports ball", "tennis racket",
+    "bed", "sofa", "chair", "table", "tv", "laptop", "refrigerator", "microwave",
+    "washing machine", "ceiling fan", "cupboard", "gas stove", "pressure cooker",
+    "bottle", "person",
 )
+
+# Classes present in model.names that the training run had no train/val images for.
+# They stay allowed (they are part of the class mapping) but are logged as unvalidated.
+UNVALIDATED_LABELS: tuple[str, ...] = ("pressure cooker",)
 
 
 def _float_env(name: str, default: float) -> float:
@@ -60,7 +62,7 @@ class Settings:
     openai_image_max_side: int = 1024
 
     local_confidence_threshold: float = 0.70
-    model_path: Path = BACKEND_DIR / "models" / "yolo26n.pt"
+    model_path: Path = DEFAULT_MODEL_PATH
     household_labels: tuple[str, ...] = DEFAULT_HOUSEHOLD_LABELS
 
     # Built React app (frontend/dist). When set and present, FastAPI serves it at "/"

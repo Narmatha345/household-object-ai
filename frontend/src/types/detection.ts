@@ -3,6 +3,8 @@ export type DetectionSource = 'local' | 'openai'
 export interface DetectedObject {
   label: string
   confidence: number | null
+  /** [x1, y1, x2, y2] in image pixels; set for local detections only. */
+  box?: number[] | null
 }
 
 /** Server-side durations in milliseconds. */

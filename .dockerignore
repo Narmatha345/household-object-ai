@@ -7,6 +7,7 @@
 **/node_modules
 frontend/dist
 backend/models/*.pt
+!backend/models/household-yolo26n.pt
 runs
 data/raw
 data/processed

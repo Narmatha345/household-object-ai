@@ -48,7 +48,15 @@ def create_app(
         if isinstance(detector, LocalObjectDetector):
             try:
                 detector.load()
-                logger.info("Local model ready: %s", settings.model_path.name)
+                logger.info("Local model ready: %s", settings.model_path)
+                model_labels = set(detector.class_names.values())
+                allowed = set(settings.household_labels)
+                if allowed and model_labels != allowed:
+                    logger.warning(
+                        "Model classes do not match the allowed classes. Not in model: %s. Ignored model classes: %s",
+                        sorted(allowed - model_labels) or "none",
+                        sorted(model_labels - allowed) or "none",
+                    )
             except ModelLoadError:
                 logger.error("Starting without a local model; requests will use the fallback.")
         if not fallback.is_configured:

@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 class RawDetection:
     label: str
     confidence: float
+    box: tuple[float, float, float, float] | None = None  # xyxy, in image pixels
 
 
 class ObjectDetector(Protocol):
@@ -51,9 +52,18 @@ class LocalObjectDetector:
     def is_loaded(self) -> bool:
         return self._model is not None
 
+    @property
+    def class_names(self) -> dict[int, str]:
+        """The model's own class mapping (model.names); empty until loaded."""
+        return dict(self._model.names) if self._model is not None else {}
+
     def load(self) -> None:
         if self._model is None:
             self._model = load_yolo_model(self._model_path)
+            logger.info(
+                "Local model loaded from %s with %d classes: %s",
+                self._model_path, len(self.class_names), self.class_names,
+            )
 
     def detect(self, image: Image.Image) -> list[RawDetection]:
         if self._model is None:
@@ -71,11 +81,25 @@ class LocalObjectDetector:
             logger.exception("Local YOLO inference failed")
             raise LocalInferenceError("Local detection failed for this image.") from exc
 
+        # Labels come only from the model's own mapping; nothing is renamed or invented.
+        names = self._model.names
         detections: list[RawDetection] = []
         for result in results:
-            names = result.names
             if result.boxes is None:
                 continue
-            for cls_id, conf in zip(result.boxes.cls.tolist(), result.boxes.conf.tolist()):
-                detections.append(RawDetection(label=str(names[int(cls_id)]), confidence=float(conf)))
+            boxes = result.boxes
+            for cls_id, conf, xyxy in zip(boxes.cls.tolist(), boxes.conf.tolist(), boxes.xyxy.tolist()):
+                x1, y1, x2, y2 = (round(float(v), 1) for v in xyxy)
+                detection = RawDetection(
+                    label=str(names[int(cls_id)]),
+                    confidence=float(conf),
+                    box=(x1, y1, x2, y2),
+                )
+                logger.debug("YOLO box: %s %.3f %s", detection.label, detection.confidence, detection.box)
+                detections.append(detection)
+        logger.info(
+            "YOLO returned %d detection(s): %s",
+            len(detections),
+            ", ".join(f"{d.label} {d.confidence:.2f}" for d in detections) or "none",
+        )
         return detections

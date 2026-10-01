@@ -30,7 +30,7 @@ def test_local_detection_timing(client, detector, fallback):
 
 
 def test_fallback_timing(client, detector, fallback):
-    detector.detections = [RawDetection("couch", 0.40)]
+    detector.detections = [RawDetection("sofa", 0.40)]
     detector.delay_s = 0.02
     fallback.delay_s = 0.08
 

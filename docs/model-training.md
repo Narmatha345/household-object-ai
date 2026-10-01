@@ -55,6 +55,12 @@ model.train(data="../data/household/data.yaml", epochs=100, imgsz=640, batch=16,
 A CUDA GPU makes this much faster (`device=0`). On CPU, start with fewer
 epochs or a smaller `imgsz` to check that the pipeline works.
 
+**No local GPU?** Use [notebooks/train_household_yolo26n_colab.ipynb](../notebooks/train_household_yolo26n_colab.ipynb)
+on a free Colab T4. Package the dataset with
+`backend\.venv\Scripts\python.exe tools\dataset\07_package_for_colab.py`, upload the zip to
+`My Drive/household-object-ai/`, and run the cells in order. Note that with a relative `project=runs`,
+Ultralytics 8.4 saves to `runs/detect/runs/<name>`. Pass an absolute `project` path to get `runs/<name>`.
+
 ## 4. Evaluate
 
 ```bash

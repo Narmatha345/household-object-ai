@@ -92,7 +92,7 @@ cp .env.example .env                    # Windows: copy .env.example .env
 # then edit .env and set OPENAI_API_KEY
 ```
 
-The first start downloads `yolo26n.pt` (~5 MB) into `backend/models/`.
+The local model is the trained household model at `backend/runs/household-yolo26n/weights/best.pt` (15 classes). It is not committed to git, so it must exist locally.
 
 ## 7. Frontend setup
 
@@ -112,11 +112,11 @@ No frontend `.env` is needed for local development. Vite proxies `/api` to
 |---|---|---|
 | `OPENAI_API_KEY` | *(empty)* | Needed for the fallback. Without it, low-confidence images return a 503 |
 | `LOCAL_CONFIDENCE_THRESHOLD` | `0.70` | Minimum local confidence to skip OpenAI |
-| `MODEL_PATH` | `models/yolo26n.pt` | Local weights, relative to `backend/` |
+| `MODEL_PATH` | `runs/household-yolo26n/weights/best.pt` | Local weights, relative to `backend/` |
 | `OPENAI_MODEL` | `gpt-4.1-mini` | Vision-capable model for the fallback |
 | `OPENAI_TIMEOUT_SECONDS` | `30` | Timeout for the OpenAI request |
 | `OPENAI_IMAGE_MAX_SIDE` | `1024` | Images are downscaled before upload to reduce cost |
-| `HOUSEHOLD_LABELS` | household COCO classes | Comma-separated allowlist; `*` accepts every model class |
+| `HOUSEHOLD_LABELS` | the 15 classes of `best.pt` | Comma-separated allowlist; `*` accepts every model class |
 | `MAX_UPLOAD_MB` | `10` | Upload size limit |
 | `CORS_ORIGINS` | `http://localhost:5173,…` | Allowed browser origins |
 
