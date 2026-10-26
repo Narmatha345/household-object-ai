@@ -6,3 +6,5 @@ python-dotenv>=1.0
 openai>=1.99
 ultralytics>=8.4.0
 onnxruntime>=1.20
+# A2A agent (app/a2a): official A2A SDK, protocol v1.0 with v0.3 compatibility.
+a2a-sdk[http-server]>=1.2.3,<2

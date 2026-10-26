@@ -66,6 +66,8 @@ household-object-ai/
 ├── backend/
 │   ├── app/
 │   │   ├── api/routes.py     /api/health, /api/detect, /api/stats
+│   │   ├── a2a/              A2A agent: Agent Card, executor, auth middleware, server (port 9100)
+│   │   ├── bootstrap.py      Model loading shared by the web API and the A2A agent
 │   │   ├── ml/               model_loader.py, detector.py (LocalObjectDetector)
 │   │   ├── services/         local_detection, openai_fallback, detection_router, stats, image_input
 │   │   ├── config.py         Environment-based settings
@@ -73,9 +75,10 @@ household-object-ai/
 │   │   ├── schemas.py        Pydantic models
 │   │   └── main.py           App factory + wiring
 │   ├── models/               YOLO weights (git-ignored, auto-downloaded)
+│   ├── scripts/a2a_client.py A2A test client (card / send / selftest / ask)
 │   └── tests/
 ├── data/                     household/ YOLO dataset (V1: 15 classes, V2: 43) for fine-tuning
-└── docs/                     architecture.md, model-training.md, household-model-plan.md
+└── docs/                     architecture.md, a2a-agent.md, model-training.md, household-model-plan.md
 ```
 
 ## 5. Local setup
@@ -129,6 +132,9 @@ No frontend `.env` is needed for local development. Vite proxies `/api` to
 | `HOUSEHOLD_LABELS` | the 15 classes of `best.pt` | Comma-separated allowlist; `*` accepts every model class |
 | `MAX_UPLOAD_MB` | `10` | Upload size limit |
 | `CORS_ORIGINS` | `http://localhost:5173,…` | Allowed browser origins |
+| `A2A_HOST` / `A2A_PORT` | `127.0.0.1` / `9100` | A2A agent bind address; a non-loopback host requires `A2A_AUTH_TOKEN` |
+| `A2A_PUBLIC_URL` | `http://127.0.0.1:9100` | Agent URL advertised in the Agent Card; must be reachable by remote agents |
+| `A2A_AUTH_TOKEN` | *(empty)* | Bearer token required on A2A requests |
 
 A `.onnx` `MODEL_PATH` runs on ONNX Runtime without importing PyTorch (about 3x less
 memory). Re-export it after retraining with
@@ -215,6 +221,56 @@ Example:
 ```bash
 curl -F "file=@living-room.jpg" http://localhost:8000/api/detect
 ```
+
+## A2A agent (Agent-to-Agent)
+
+The detector is also available as an [A2A](https://a2a-protocol.org) agent, so other AI agents
+(for example, one on a mentor's laptop reached over Tailscale) can discover it and send it photos.
+The full guide is in **[docs/a2a-agent.md](docs/a2a-agent.md)**.
+
+**A2A vs. the model.** YOLO does the recognition. A2A is only the protocol other agents use to
+find this agent (the **Agent Card**) and hand it work (a JSON-RPC **Task** that returns an
+**Artifact**). `app/a2a/` is a thin adapter around the same `DetectionRouter` that serves
+`/api/detect`, so both return identical results for the same image.
+
+```
+Remote agent ──Tailnet──► A2A server :9100  (python -m app.a2a, separate from the web app)
+                           ├─ GET  /.well-known/agent-card.json   public: skill, modes, URL, auth scheme
+                           ├─ POST /a2a   JSON-RPC, A2A 1.0 (+0.3)   requires Authorization: Bearer
+                           │     └─ validate image → DetectionRouter (local YOLO → 70% gate → fallback)
+                           └─ GET  /health    operator check, not part of A2A
+```
+
+- **Input:** one JPEG/PNG/WEBP image as a file part with inline bytes (max `MAX_UPLOAD_MB`).
+- **Output:** task `COMPLETED` with a `detections` artifact containing JSON (`objects[]` with
+  `label`, `confidence`, `box`) and a text summary. Bad input returns JSON-RPC errors
+  (`-32602`, `-32005`). Inference/fallback problems return task `FAILED` with no artifact.
+  Detections are never fabricated.
+- **Security:** a bearer token (`A2A_AUTH_TOKEN`) is required on every request. The server
+  refuses to listen on a network interface without one. Tailnet access alone is not treated as
+  authorization.
+
+**Run locally (Windows / VS Code terminal):**
+
+```powershell
+cd backend
+.venv\Scripts\activate
+pip install -r requirements-dev.txt
+python -m app.a2a                                           # http://127.0.0.1:9100
+
+curl.exe http://127.0.0.1:9100/.well-known/agent-card.json  # inspect the Agent Card
+python scripts\a2a_client.py send path\to\room.jpg          # labels + confidence scores
+python scripts\a2a_client.py selftest path\to\room.jpg      # PASS/FAIL checklist
+```
+
+**Connect over Tailscale.** Recommended setup: keep the agent on `127.0.0.1`, set
+`A2A_PUBLIC_URL=https://<machine>.<tailnet>.ts.net`, enable HTTPS Certificates in the Tailscale
+admin console, and run `tailscale serve --bg 9100`. Never use `tailscale funnel`, which is public.
+Your mentor then runs `a2a_client.py` with
+`--url https://<machine>.<tailnet>.ts.net --token <shared token>`, or points their own agent at
+that Agent Card. Find your address with `tailscale ip -4` and `tailscale status`. Remote
+testing, the direct-IP alternative, the scoped firewall rule and troubleshooting are all in
+[docs/a2a-agent.md](docs/a2a-agent.md).
 
 ## 13. Replacing the pretrained model with a custom household model
 
